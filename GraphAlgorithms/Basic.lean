@@ -53,6 +53,8 @@ lemma two_mul_choose_two_cancel (n : ℕ ) : 2*n.choose 2 = n*(n - 1) := by
 
 open SimpleGraph Finset Classical
 
+def Edge n:= Sym2 (Fin n)
+
 @[ext, aesop safe constructors (rule_sets := [SimpleGraph])]
 structure WeightedSimpleGraph (V : Type u) [Fintype V] extends SimpleGraph V  where
   w: V → V → ℕ
@@ -125,47 +127,40 @@ noncomputable def BinarySqMatrix.dist {n :ℕ}(M : BinarySqMatrix n) (e : Sym2 (
 := (SimpleGraph.fromRel M).dist (Quot.out e).1 (Quot.out e).2
 
 
-lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Sym2 (Fin n)} (h: e ∈ G.edgeSet):
-  let G' := G.deleteEdges {e}
+lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) { E : Set (Edge n)} (h_subset: E ⊆ G.edgeSet) (h: E.Nonempty):
+  let G' := G.deleteEdges E
   #G'.edgeFinset < #G.edgeFinset := by
 
   extract_lets G'
   suffices G'.edgeFinset ⊂ G.edgeFinset from card_lt_card this
+
   simp only [Set.ssubset_toFinset, Set.coe_toFinset, edgeSet_ssubset_edgeSet]
   simp [G',deleteEdges]
+
   refine sdiff_lt ?_ ?_
-  · show fromEdgeSet {e} ≤ G
+  · show fromEdgeSet E ≤ G
     refine edgeFinset_subset_edgeFinset.mp ?_
     dsimp [Set.subset_toFinset, Set.coe_toFinset, edgeSet_fromEdgeSet]
     intro x hx
-    rw [mem_edgeFinset]
-    rw [mem_edgeFinset] at hx
-    obtain ⟨i,j,hij⟩ : ∃ u v, s(u,v) = x  :=  by
-      use (Quot.out x).1, (Quot.out x).2
-      aesop
-    rw [← hij]
-    rw [mem_edgeSet]
-    rw [← hij] at hx
-    rw [mem_edgeSet] at hx
-    simp [fromEdgeSet] at hx
-    obtain ⟨sijeqe,_⟩ := hx
-    have: e ∈ (edgeFinset G).toList := by aesop
-    simp at this
-    rw [← sijeqe] at this
-    rw [mem_edgeSet] at this
-    exact this
+    aesop
 
-  · show fromEdgeSet {e} ≠ ⊥
+  · show fromEdgeSet E ≠ ⊥
     by_contra! empty
     rw [← SimpleGraph.edgeSet_eq_empty] at empty
     simp at empty
     rw [@Set.diff_eq_empty] at empty
-    simp at empty
-    suffices ¬ e.IsDiag by contradiction
+    replace empty: ∀ e ∈ E, e.IsDiag := by aesop
+    let e := h.some
+    have  einE:= Set.Nonempty.some_mem h
+    suffices ¬ e.IsDiag by
+      have: Sym2.IsDiag e := by exact empty e einE
+      contradiction
     refine G.not_isDiag_of_mem_edgeSet ?_
-    exact h
+    exact h_subset einE
 
-def Edge n:= Sym2 (Fin n)
+lemma cardGDele_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Sym2 (Fin n)} (h: e ∈ G.edgeSet):
+  let G' := G.deleteEdges {e}
+  #G'.edgeFinset < #G.edgeFinset := by apply cardGDel_lt_cardG_of;aesop; aesop
 
 noncomputable def GreedySpannerRec {n :ℕ } (G : FinSimpleGraph n) (H :Set (Edge n)) (t :ℕ) : FinSimpleGraph n :=
   if h: G = emptyGraph (Fin n) then fromEdgeSet H
@@ -182,14 +177,13 @@ noncomputable def GreedySpannerRec {n :ℕ } (G : FinSimpleGraph n) (H :Set (Edg
     else GreedySpannerRec G' H t
 
   termination_by #G.edgeFinset decreasing_by all_goals (
-    apply cardGDel_lt_cardG_of G
+    apply cardGDele_lt_cardG_of G
     apply mem_edgeFinset.mp
     apply mem_toList.mp
     exact List.head_mem Gnonempty
   )
 
-noncomputable def GreedySpanner {n :ℕ } (G : FinSimpleGraph n) (t :ℕ) :=
-  GreedySpannerRec G {} t
+noncomputable def GreedySpanner {n :ℕ } (G : FinSimpleGraph n) (t :ℕ) := GreedySpannerRec G {} t
 
  def greedySpannerImperative {n:ℕ }(G : FinSimpleGraph n) (t :ℕ ): FinSimpleGraph n := Id.run do
   let mut f_H : BinarySqMatrix n := fun (_ _) ↦ false
