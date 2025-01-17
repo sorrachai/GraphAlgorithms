@@ -127,40 +127,52 @@ noncomputable def BinarySqMatrix.dist {n :ℕ}(M : BinarySqMatrix n) (e : Sym2 (
 := (SimpleGraph.fromRel M).dist (Quot.out e).1 (Quot.out e).2
 
 
-lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) { E : Set (Edge n)} (h_subset: E ⊆ G.edgeSet) (h: E.Nonempty):
+lemma cardGDel_lt_cardG_of'{n : ℕ }(G : FinSimpleGraph n) { E : Set (Edge n)} (h_subset: E ⊆ G.edgeSet) (h: E.Nonempty):
   let G' := G.deleteEdges E
+  G' < G := by
+  constructor
+  aesop_graph
+  --aesop_graph (add simp [h,h_subset])
+  refine not_le_of_lt ?_
+  rw [@Pi.lt_def]
+  constructor
+  aesop_graph
+  let e := h.some
+  have  einE:= Set.Nonempty.some_mem h
+  sorry
+
+
+lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
+  let G' := G.deleteEdges {e}
   #G'.edgeFinset < #G.edgeFinset := by
 
   extract_lets G'
   suffices G'.edgeFinset ⊂ G.edgeFinset from card_lt_card this
-
   simp only [Set.ssubset_toFinset, Set.coe_toFinset, edgeSet_ssubset_edgeSet]
   simp [G',deleteEdges]
-
   refine sdiff_lt ?_ ?_
-  · show fromEdgeSet E ≤ G
+  · show fromEdgeSet {e} ≤ G
     refine edgeFinset_subset_edgeFinset.mp ?_
     dsimp [Set.subset_toFinset, Set.coe_toFinset, edgeSet_fromEdgeSet]
     intro x hx
     aesop
 
-  · show fromEdgeSet E ≠ ⊥
+  · show fromEdgeSet {e} ≠ ⊥
     by_contra! empty
     rw [← SimpleGraph.edgeSet_eq_empty] at empty
     simp at empty
-    rw [@Set.diff_eq_empty] at empty
-    replace empty: ∀ e ∈ E, e.IsDiag := by aesop
-    let e := h.some
-    have  einE:= Set.Nonempty.some_mem h
-    suffices ¬ e.IsDiag by
-      have: Sym2.IsDiag e := by exact empty e einE
-      contradiction
-    refine G.not_isDiag_of_mem_edgeSet ?_
-    exact h_subset einE
 
-lemma cardGDele_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Sym2 (Fin n)} (h: e ∈ G.edgeSet):
-  let G' := G.deleteEdges {e}
-  #G'.edgeFinset < #G.edgeFinset := by apply cardGDel_lt_cardG_of;aesop; aesop
+    rw [@Set.diff_eq_empty] at empty
+    simp at empty
+
+    suffices ¬ e.IsDiag by contradiction
+    refine G.not_isDiag_of_mem_edgeSet ?_
+    exact h
+
+
+lemma cardGDel_eq_cardG_minus_of{n : ℕ }(G : FinSimpleGraph n) {E : Finset (Edge n)} (h: E ⊆  G.edgeFinset) :
+let G' := G.deleteEdges (E : Set (Edge n))
+#G'.edgeFinset = #G.edgeFinset - #E := by sorry
 
 noncomputable def GreedySpannerRec {n :ℕ } (G : FinSimpleGraph n) (H :Set (Edge n)) (t :ℕ) : FinSimpleGraph n :=
   if h: G = emptyGraph (Fin n) then fromEdgeSet H
@@ -177,7 +189,7 @@ noncomputable def GreedySpannerRec {n :ℕ } (G : FinSimpleGraph n) (H :Set (Edg
     else GreedySpannerRec G' H t
 
   termination_by #G.edgeFinset decreasing_by all_goals (
-    apply cardGDele_lt_cardG_of G
+    apply cardGDel_lt_cardG_of G
     apply mem_edgeFinset.mp
     apply mem_toList.mp
     exact List.head_mem Gnonempty
