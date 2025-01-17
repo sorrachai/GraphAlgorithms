@@ -138,11 +138,13 @@ lemma cardGDel_lt_cardG_of'{n : ℕ }(G : FinSimpleGraph n) { e : Edge n} (h:  e
   constructor
   aesop_graph
   use v
+
   simp only [deleteEdges_adj, Set.mem_singleton_iff]
   have x: s(u,v) = e := by aesop
   have: (¬ s(u,v) = e) = False := by aesop
   rw [this]
   simp only [and_false, gt_iff_lt]
+
   suffices  G.Adj u v by
     simp only [gt_iff_lt]
     exact lt_of_le_not_le (fun a ↦ this) fun a ↦ a this
@@ -184,33 +186,34 @@ example {n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
     exact h
 
 
-
+-- A nice lemma to prove, but no need for now.
 lemma cardGDel_eq_cardG_minus_of{n : ℕ }(G : FinSimpleGraph n) {E : Finset (Edge n)} (h: E ⊆  G.edgeFinset) :
 let G' := G.deleteEdges (E : Set (Edge n))
 #G'.edgeFinset = #G.edgeFinset - #E := by sorry
 
-noncomputable def GreedySpannerRec {n :ℕ } (G : FinSimpleGraph n) (H :Set (Edge n)) (t :ℕ) : FinSimpleGraph n :=
-  if h: G = emptyGraph (Fin n) then fromEdgeSet H
-  else
-    have Gnonempty: (edgeFinset G).toList ≠ [] := by
-      simp only [ne_eq, toList_eq_nil, Set.toFinset_eq_empty, edgeSet_eq_empty]
-      exact h
-    let e := G.edgeFinset.toList.head Gnonempty
-    let u := (Quot.out e).1
-    let v := (Quot.out e).2
-    let G' := G.deleteEdges {e}
-    if h_dist: (2*t -1) < (fromEdgeSet H).dist u v then
-      GreedySpannerRec G' (H ∪ {e}) t
-    else GreedySpannerRec G' H t
+noncomputable def GreedySpanner {n :ℕ } (G : FinSimpleGraph n) (t :ℕ) :=
+  GreedySpannerRec G {} t
+where
+  GreedySpannerRec {n :ℕ } (G : FinSimpleGraph n) (E_H :Set (Edge n)) (t :ℕ) : FinSimpleGraph n :=
+    if h: G = emptyGraph (Fin n) then fromEdgeSet E_H
+    else
+      have Gnonempty: (edgeFinset G).toList ≠ [] := by
+        simp only [ne_eq, toList_eq_nil, Set.toFinset_eq_empty, edgeSet_eq_empty]
+        exact h
+      let e := G.edgeFinset.toList.head Gnonempty
+      let u := (Quot.out e).1
+      let v := (Quot.out e).2
+      let G' := G.deleteEdges {e}
+      if h_dist: (2*t -1) < (fromEdgeSet E_H).dist u v then
+        GreedySpannerRec G' (E_H ∪ {e}) t
+      else GreedySpannerRec G' E_H t
 
-  termination_by #G.edgeFinset decreasing_by all_goals (
-    apply cardGDel_lt_cardG_of G
-    apply mem_edgeFinset.mp
-    apply mem_toList.mp
-    exact List.head_mem Gnonempty
-  )
-
-noncomputable def GreedySpanner {n :ℕ } (G : FinSimpleGraph n) (t :ℕ) := GreedySpannerRec G {} t
+    termination_by #G.edgeFinset decreasing_by all_goals (
+      apply cardGDel_lt_cardG_of G
+      apply mem_edgeFinset.mp
+      apply mem_toList.mp
+      exact List.head_mem Gnonempty
+    )
 
  def greedySpannerImperative {n:ℕ }(G : FinSimpleGraph n) (t :ℕ ): FinSimpleGraph n := Id.run do
   let mut f_H : BinarySqMatrix n := fun (_ _) ↦ false
@@ -219,13 +222,43 @@ noncomputable def GreedySpanner {n :ℕ } (G : FinSimpleGraph n) (t :ℕ) := Gre
   SimpleGraph.fromRel f_H
 
 
-lemma GreedySpannerPreserveDistanceLB {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) (u v : Fin n) :
+lemma GreedySpannerPreserveDistanceLB {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) {e : Edge n} (he: e ∈ G.edgeSet) :
   let H := GreedySpanner G t
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
   G.dist u v ≤ H.dist u v  := by sorry
 
-lemma GreedySpannerPreserveDistanceUB {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) (u v : Fin n) :
+
+lemma GreedySpannerPreserveDistanceUB {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) {e : Edge n} (he: e ∈ G.edgeSet) :
   let H := GreedySpanner G t
-  H.dist u v ≤ 2*t-1 := by sorry
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
+  H.dist u v ≤ 2*t-1  := by
+  extract_lets H u v
+  exact aux G {}
+where
+  aux (G_aux : FinSimpleGraph n) (E_H :Set (Edge n))
+    : let H' := GreedySpanner.GreedySpannerRec G E_H t
+      let u := (Quot.out e).1
+      let v := (Quot.out e).2
+      H'.dist u v ≤ 2*t-1 := by
+
+      match h: #G_aux.edgeFinset with
+      | 0 =>
+        have h: G_aux = emptyGraph (Fin n) := by
+          rw [@card_eq_zero] at h
+          rwa [@edgeFinset_eq_empty] at h
+        sorry
+        --have: H' = fromEdgeSet E_H := by simp [H',h,GreedySpanner.GreedySpannerRec]
+      | k => sorry--extract_lets H' u v
+        --sorry
+
+      --extract_lets H' u v
+      --if h:G = emptyGraph (Fin n) then
+      --  have: H' = fromEdgeSet E_H := by simp [H',h,GreedySpanner.GreedySpannerRec]
+      --  have: (fromEdgeSet E_H).dist u v ≤ 2*t-1 := by
+
+      --else sorry
 
 lemma correctnessOfGreedySpanner {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) :
   let H := GreedySpanner G t
