@@ -79,7 +79,6 @@ def FinSimpleGraph.mk' {n : ℕ}:
     intro h
     simp only [ne_eq, SimpleGraph.mk.injEq]
     exact h
---noncomputable instance  FinSimpleGraphMaxInst (n :ℕ ): Max (FinSimpleGraph n) := by exact { max := fun a b ↦ (a : SimpleGraph (Fin n) ⊓ (b : SimpleGraph (Fin n)}
 
 noncomputable instance  FinSimpleGraphFintypeInst (n :ℕ ): Fintype (FinSimpleGraph n) where
   elems := Finset.univ.map FinSimpleGraph.mk'
@@ -93,9 +92,6 @@ noncomputable instance  FinSimpleGraphFintypeInst (n :ℕ ): Fintype (FinSimpleG
     · refine FinSimpleGraph.ext_iff.mpr ?_
       ext i j
       simp
-
---noncomputable instance  FinSimpleGraphEdgeSetInst (n :ℕ ) (G : FinSimpleGraph n): Fintype G.edgeSet := G.fintypeEdgeSet
---noncomputable instance  FinOrderTopInst (n :ℕ )[NeZero n]: OrderTop (Fin n) := by refine WellFoundedGT.toOrderTop
 
 open FinSimpleGraph Std
 
@@ -119,7 +115,6 @@ noncomputable def exGirth (n t:ℕ)  : ℕ := sup {H : FinSimpleGraph n | 2*t + 
 
 lemma exGirthUB (n t:ℕ) : exGirth n t ≤ 100 * n * (NNReal.rpow ↑n (1/(↑t))) := sorry
 
-
 def BinarySqMatrix.AddEdge {n :ℕ}(M : BinarySqMatrix n) ( e : Sym2 (Fin n) ):
  Fin n → Fin n → Prop := fun (i j : Fin n) ↦ M i j ∨ (e = s(i,j))
 
@@ -132,7 +127,6 @@ lemma cardGDel_lt_cardG_of'{n : ℕ }(G : FinSimpleGraph n) { e : Edge n} (h:  e
   G' < G := by
   constructor
   aesop_graph
-  --aesop_graph (add simp [h,h_subset])
   refine not_le_of_lt ?_
   rw [@Pi.lt_def]
   constructor
@@ -145,16 +139,26 @@ lemma cardGDel_lt_cardG_of'{n : ℕ }(G : FinSimpleGraph n) { e : Edge n} (h:  e
   aesop_graph
   use v
   simp only [deleteEdges_adj, Set.mem_singleton_iff]
-  have: s(u,v) = e := by aesop
+  have x: s(u,v) = e := by aesop
   have: (¬ s(u,v) = e) = False := by aesop
   rw [this]
   simp only [and_false, gt_iff_lt]
   suffices  G.Adj u v by
     simp only [gt_iff_lt]
     exact lt_of_le_not_le (fun a ↦ this) fun a ↦ a this
-  sorry
+  rw [@adj_iff_exists_edge_coe]
+  aesop
 
 lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
+  let G' := G.deleteEdges {e}
+  #G'.edgeFinset < #G.edgeFinset := by
+
+  extract_lets G'
+  have: G' < G := cardGDel_lt_cardG_of' G h
+  suffices G'.edgeFinset ⊂ G.edgeFinset from card_lt_card this
+  aesop
+
+example {n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
   let G' := G.deleteEdges {e}
   #G'.edgeFinset < #G.edgeFinset := by
 
@@ -165,7 +169,7 @@ lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e �
   refine sdiff_lt ?_ ?_
   · show fromEdgeSet {e} ≤ G
     refine edgeFinset_subset_edgeFinset.mp ?_
-    dsimp [Set.subset_toFinset, Set.coe_toFinset, edgeSet_fromEdgeSet]
+    simp [Set.subset_toFinset, Set.coe_toFinset, edgeSet_fromEdgeSet]
     intro x hx
     aesop
 
@@ -178,6 +182,7 @@ lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e �
     suffices ¬ e.IsDiag by contradiction
     refine G.not_isDiag_of_mem_edgeSet ?_
     exact h
+
 
 
 lemma cardGDel_eq_cardG_minus_of{n : ℕ }(G : FinSimpleGraph n) {E : Finset (Edge n)} (h: E ⊆  G.edgeFinset) :
