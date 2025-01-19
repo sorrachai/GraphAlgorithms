@@ -52,7 +52,7 @@ lemma two_mul_choose_two_cancel (n : ℕ ) : 2*n.choose 2 = n*(n - 1) := by
 -- What is the minimum size of E′ that can be achieved?
 
 open SimpleGraph Finset Classical
-
+variable {n t : ℕ} [NeZero t]
 def Edge n:= Sym2 (Fin n)
 
 @[ext, aesop safe constructors (rule_sets := [SimpleGraph])]
@@ -62,14 +62,14 @@ structure WeightedSimpleGraph (V : Type u) [Fintype V] extends SimpleGraph V  wh
 
 def FinSimpleGraph (n : ℕ) := SimpleGraph (Fin n)
 
-@[ext] theorem FinSimpleGraph.ext {n : ℕ} {G H : FinSimpleGraph n} (h: G.Adj = H.Adj): G = H := by
+@[ext] theorem FinSimpleGraph.ext {G H : FinSimpleGraph n} (h: G.Adj = H.Adj): G = H := by
   cases G; cases H
   simp only [SimpleGraph.mk] at h
   subst h
   rfl
 
 @[simps]
-def FinSimpleGraph.mk' {n : ℕ}:
+def FinSimpleGraph.mk':
     {adj : Fin n → Fin n → Prop // (∀ x y, adj x y = adj y x) ∧ (∀ x, ¬ adj x x)} ↪ FinSimpleGraph n where
   toFun x := ⟨fun v w ↦ x.1 v w, fun v w ↦ by simp [x.2.1], fun v ↦ by simp [x.2.2]⟩
   inj' := by
@@ -95,10 +95,10 @@ noncomputable instance  FinSimpleGraphFintypeInst (n :ℕ ): Fintype (FinSimpleG
 
 open FinSimpleGraph Std
 
-def FinSimpleGraph.IsSpannerOf {n:ℕ } (H G : FinSimpleGraph n)  (t:ℕ)  : Prop :=
+def FinSimpleGraph.IsSpannerOf   (H G : FinSimpleGraph n)  (t:ℕ)  : Prop :=
   H.IsSubgraph G ∧ ∀ u v : Fin n, H.dist u v ≤ t * G.dist u v ∧ G.dist u v ≤ H.dist u v
 
-lemma num_edges_le_nn {n :ℕ}  (G :FinSimpleGraph n):  #G.edgeFinset < n*n+1:= by
+lemma num_edges_le_nn   (G :FinSimpleGraph n):  #G.edgeFinset < n*n+1:= by
   calc
     #G.edgeFinset ≤ (Fintype.card (Fin n)).choose 2 := SimpleGraph.card_edgeFinset_le_card_choose_two
     _ ≤ 2* ((Fintype.card (Fin n)).choose 2) := by omega
@@ -110,19 +110,19 @@ lemma num_edges_le_nn {n :ℕ}  (G :FinSimpleGraph n):  #G.edgeFinset < n*n+1:= 
       simp
       simp
 
-noncomputable def FinSimpleGraph.numEdges {n : ℕ}(G : FinSimpleGraph n) : ℕ := #G.edgeFinset
+noncomputable def FinSimpleGraph.numEdges  (G : FinSimpleGraph n) : ℕ := #G.edgeFinset
 noncomputable def exGirth (n t:ℕ)  : ℕ := sup {H : FinSimpleGraph n | 2*t + 1 ≤ H.girth } numEdges
 
 lemma exGirthUB (n t:ℕ) : exGirth n t ≤ 100 * n * (NNReal.rpow ↑n (1/(↑t))) := sorry
 
-def BinarySqMatrix.AddEdge {n :ℕ}(M : BinarySqMatrix n) ( e : Sym2 (Fin n) ):
+def BinarySqMatrix.AddEdge  (M : BinarySqMatrix n) ( e : Sym2 (Fin n) ):
  Fin n → Fin n → Prop := fun (i j : Fin n) ↦ M i j ∨ (e = s(i,j))
 
-noncomputable def BinarySqMatrix.dist {n :ℕ}(M : BinarySqMatrix n) (e : Sym2 (Fin n)): ℕ
+noncomputable def BinarySqMatrix.dist (M : BinarySqMatrix n) (e : Sym2 (Fin n)): ℕ
 := (SimpleGraph.fromRel M).dist (Quot.out e).1 (Quot.out e).2
 
 
-lemma cardGDel_lt_cardG_of'{n : ℕ }(G : FinSimpleGraph n) { e : Edge n} (h:  e ∈ G.edgeSet):
+lemma cardGDel_lt_cardG_of' (G : FinSimpleGraph n) { e : Edge n} (h:  e ∈ G.edgeSet):
   let G' := G.deleteEdges {e}
   G' < G := by
   constructor
@@ -151,7 +151,7 @@ lemma cardGDel_lt_cardG_of'{n : ℕ }(G : FinSimpleGraph n) { e : Edge n} (h:  e
   rw [@adj_iff_exists_edge_coe]
   aesop
 
-lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
+lemma cardGDel_lt_cardG_of (G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
   let G' := G.deleteEdges {e}
   #G'.edgeFinset < #G.edgeFinset := by
 
@@ -160,7 +160,7 @@ lemma cardGDel_lt_cardG_of{n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e �
   suffices G'.edgeFinset ⊂ G.edgeFinset from card_lt_card this
   aesop
 
-example {n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
+example  (G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
   let G' := G.deleteEdges {e}
   #G'.edgeFinset < #G.edgeFinset := by
 
@@ -187,14 +187,14 @@ example {n : ℕ }(G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
 
 
 -- A nice lemma to prove, but no need for now.
-lemma cardGDel_eq_cardG_minus_of{n : ℕ }(G : FinSimpleGraph n) {E : Finset (Edge n)} (h: E ⊆  G.edgeFinset) :
+lemma cardGDel_eq_cardG_minus_of (G : FinSimpleGraph n) {E : Finset (Edge n)} (h: E ⊆  G.edgeFinset) :
 let G' := G.deleteEdges (E : Set (Edge n))
 #G'.edgeFinset = #G.edgeFinset - #E := by sorry
 
-noncomputable def GreedySpanner {n :ℕ } (G : FinSimpleGraph n) (t :ℕ) :=
-  GreedySpannerRec G {} t
-where
-  GreedySpannerRec {n :ℕ } (G : FinSimpleGraph n) (E_H :Set (Edge n)) (t :ℕ) : FinSimpleGraph n :=
+
+noncomputable def GreedySpannerRec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E_H :Set (Edge n))  (itr target:ℕ)   : FinSimpleGraph n :=
+    if target ≤ itr then fromEdgeSet E_H
+    else
     if h: G = emptyGraph (Fin n) then fromEdgeSet E_H
     else
       have Gnonempty: (edgeFinset G).toList ≠ [] := by
@@ -205,8 +205,8 @@ where
       let v := (Quot.out e).2
       let G' := G.deleteEdges {e}
       if h_dist: (2*t -1) < (fromEdgeSet E_H).dist u v then
-        GreedySpannerRec G' (E_H ∪ {e}) t
-      else GreedySpannerRec G' E_H t
+        GreedySpannerRec t G' (E_H ∪ {e}) (itr+1) target
+      else GreedySpannerRec t G' E_H (itr +1) target
 
     termination_by #G.edgeFinset decreasing_by all_goals (
       apply cardGDel_lt_cardG_of G
@@ -215,60 +215,58 @@ where
       exact List.head_mem Gnonempty
     )
 
- def greedySpannerImperative {n:ℕ }(G : FinSimpleGraph n) (t :ℕ ): FinSimpleGraph n := Id.run do
+noncomputable def FinSimpleGraph.IndexOfEdge (G : FinSimpleGraph n) (e : Edge n) : ℕ := (G.edgeFinset.toList.indexOf e)
+
+noncomputable def GreedySpanner   (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
+  GreedySpannerRec t G {} 0 #G.edgeFinset
+
+noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]  :=
+  GreedySpannerRec t G {} 0 i
+
+lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
+  let H_i := GreedySpanner_itr G t (G.IndexOfEdge e)
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
+  H_i.dist u v ≤ 2*t-1 := by sorry
+
+
+lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
+  let H_i := GreedySpanner_itr G t i
+  let H := GreedySpanner G t
+  H_i.IsSubgraph H := by sorry
+
+lemma greedySpannerSubgraphOf(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
+  let H := GreedySpanner G t
+  H.IsSubgraph G := by sorry
+
+ def greedySpannerImperative  (G : FinSimpleGraph n) (t :ℕ )[NeZero t] : FinSimpleGraph n := Id.run do
   let mut f_H : BinarySqMatrix n := fun (_ _) ↦ false
   for e in G.edgeFinset.toList do
     if (2*t -1) < f_H.dist e then f_H := f_H.AddEdge e
   SimpleGraph.fromRel f_H
 
+lemma GreedySpannerPreserveDistanceUB (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
+  let H := GreedySpanner G t
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
+  H.dist u v ≤ 2*t-1  := by sorry
 
-lemma GreedySpannerPreserveDistanceLB {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) {e : Edge n} (he: e ∈ G.edgeSet) :
+lemma GreedySpannerPreserveDistanceLB  (G : FinSimpleGraph n)(t :ℕ )[NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
   let H := GreedySpanner G t
   let u := (Quot.out e).1
   let v := (Quot.out e).2
   G.dist u v ≤ H.dist u v  := by sorry
 
 
-lemma GreedySpannerPreserveDistanceUB {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) {e : Edge n} (he: e ∈ G.edgeSet) :
-  let H := GreedySpanner G t
-  let u := (Quot.out e).1
-  let v := (Quot.out e).2
-  H.dist u v ≤ 2*t-1  := by
-  extract_lets H u v
-  exact aux G {}
-where
-  aux (G_aux : FinSimpleGraph n) (E_H :Set (Edge n))
-    : let H' := GreedySpanner.GreedySpannerRec G E_H t
-      let u := (Quot.out e).1
-      let v := (Quot.out e).2
-      H'.dist u v ≤ 2*t-1 := by
-
-      match h: #G_aux.edgeFinset with
-      | 0 =>
-        have h: G_aux = emptyGraph (Fin n) := by
-          rw [@card_eq_zero] at h
-          rwa [@edgeFinset_eq_empty] at h
-        sorry
-        --have: H' = fromEdgeSet E_H := by simp [H',h,GreedySpanner.GreedySpannerRec]
-      | k => sorry--extract_lets H' u v
-        --sorry
-
-      --extract_lets H' u v
-      --if h:G = emptyGraph (Fin n) then
-      --  have: H' = fromEdgeSet E_H := by simp [H',h,GreedySpanner.GreedySpannerRec]
-      --  have: (fromEdgeSet E_H).dist u v ≤ 2*t-1 := by
-
-      --else sorry
-
-lemma correctnessOfGreedySpanner {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) :
+lemma correctnessOfGreedySpanner (G : FinSimpleGraph n) (t : ℕ) [NeZero t]:
   let H := GreedySpanner G t
   H.IsSpannerOf G (2*t-1) := by sorry
 
-lemma girthOfGreedySpanner {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) :
+lemma girthOfGreedySpanner {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) [NeZero t] :
   let H := GreedySpanner G t
   2*t + 1 ≤ H.girth:= sorry
 
-lemma sparsityOfGreedySpanner {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) :
+lemma sparsityOfGreedySpanner {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
   let H := GreedySpanner G t
   H.numEdges ≤ 100 * t * n * (NNReal.rpow ↑n (1/(↑t))) := sorry
 
