@@ -215,7 +215,15 @@ noncomputable def GreedySpannerRec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E
       exact List.head_mem Gnonempty
     )
 
-noncomputable def FinSimpleGraph.IndexOfEdge (G : FinSimpleGraph n) (e : Edge n) : ℕ := (G.edgeFinset.toList.indexOf e)
+noncomputable def FinSimpleGraph.IndexOfEdgeInG (G : FinSimpleGraph n) (e : Edge n) (h: e ∈ G.edgeSet) : ℕ :=
+  let o := (G.edgeFinset.toList.indexOf? e)
+  have: o.isSome := by
+    simp [o,List.indexOf?]
+    rw [List.findIdx?_isSome]
+    aesop
+  o.get this
+
+--noncomputable def FinSimpleGraph.IndexOfEdge (G : FinSimpleGraph n) (e : Edge n) : ℕ := (G.edgeFinset.toList.indexOf e)
 
 noncomputable def GreedySpanner   (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
   GreedySpannerRec t G {} 0 #G.edgeFinset
@@ -224,7 +232,7 @@ noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]
   GreedySpannerRec t G {} 0 i
 
 lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
-  let H_i := GreedySpanner_itr G t (G.IndexOfEdge e)
+  let H_i := GreedySpanner_itr G t (G.IndexOfEdgeInG e he)
   let u := (Quot.out e).1
   let v := (Quot.out e).2
   H_i.dist u v ≤ 2*t-1 := by sorry
