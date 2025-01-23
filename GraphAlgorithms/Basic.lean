@@ -251,20 +251,22 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
 
   induction G, ({}: Set (Edge n)), 0, i using GreedySpannerRec.induct t with
   | case1 G_aux E_H_aux itr =>
-    have: fromEdgeSet E_H_aux = GreedySpannerRec t G_aux E_H_aux itr (itr + 1) :=
-      by simp only [GreedySpannerRec, ↓reduceIte]
-    rw [← this]
     conv =>
-      right
-      enter [5]
-      rw [add_assoc]
-      simp
+      conv =>
+        left
+        simp only [GreedySpannerRec, ↓reduceIte]
+      conv =>
+        right
+        enter [5]
+        rw [add_assoc]
+        simp
+
     obtain G_empty | G_nonempty : G_aux = (emptyGraph (Fin n)) ∨ G_aux ≠ (emptyGraph (Fin n)) := eq_or_ne G_aux (emptyGraph (Fin n))
     · -- G_empty
-      have: fromEdgeSet E_H_aux = GreedySpannerRec t G_aux E_H_aux itr (itr + 2) := by
+      conv =>
+        right
         simp only [G_empty, emptyGraph_eq_bot, GreedySpannerRec, add_right_inj, OfNat.ofNat_ne_one,
           ↓reduceIte, ↓reduceDIte]
-      rw [← this]
     · -- G_nonempty
       have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
       have Gnonempty: (edgeFinset G_aux).toList ≠ [] := by
