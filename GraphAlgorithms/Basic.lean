@@ -254,34 +254,40 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
     have: fromEdgeSet E_H_aux = GreedySpannerRec t G_aux E_H_aux itr (itr + 1) :=
       by simp only [GreedySpannerRec, ↓reduceIte]
     rw [← this]
+    conv =>
+      right
+      enter [5]
+      rw [add_assoc]
+      simp
+    obtain G_empty | G_nonempty : G_aux = (emptyGraph (Fin n)) ∨ G_aux ≠ (emptyGraph (Fin n)) := eq_or_ne G_aux (emptyGraph (Fin n))
+    · -- G_empty
+      have: fromEdgeSet E_H_aux = GreedySpannerRec t G_aux E_H_aux itr (itr + 2) := by
+        simp only [G_empty, emptyGraph_eq_bot, GreedySpannerRec, add_right_inj, OfNat.ofNat_ne_one,
+          ↓reduceIte, ↓reduceDIte]
+      rw [← this]
+    · -- G_nonempty
+      have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
+      have Gnonempty: (edgeFinset G_aux).toList ≠ [] := by
+        simp only [ne_eq, toList_eq_nil, Set.toFinset_eq_empty, edgeSet_eq_empty]
+        exact G_nonempty
 
---    sorry
+      let e := G_aux.edgeFinset.toList.head Gnonempty
+      let u := (Quot.out e).1
+      let v := (Quot.out e).2
+      let G' := G_aux.deleteEdges {e}
 
---    obtain h1 | h2 : ((2*t -1) < (fromEdgeSet E_H_aux).dist u v) ∨ ((2*t -1) ≥ (fromEdgeSet E_H).dist u v) := by exact?
-
-
-
-
-
-
-
-    sorry
-
-
-
-
-
-    --simp [h, GreedySpannerRec]
-
---    have claim1: (fromEdgeSet E_H_aux) = GreedySpannerRec t G_aux E_H_aux 0 target := by
-      --simp [h,GreedySpannerRec]
-
-
-
-
-
-
-
+      obtain h_dist_long | h_dist_short : ((2*t -1) < (fromEdgeSet E_H_aux).dist u v) ∨ ((2*t -1) ≥  (fromEdgeSet E_H_aux).dist u v) := by exact        Nat.lt_or_ge (2 * t - 1) ((fromEdgeSet E_H_aux).dist u v)
+      · -- h_dist_long
+        conv =>
+          right
+          simp [h_dist_long,u,v,e,G',Gnotbot,GreedySpannerRec]
+        refine fromEdgeSet_mono ?_
+        aesop
+      · -- h_dist_short
+        observe o: ¬((2*t -1) <  (fromEdgeSet E_H_aux).dist u v)
+        conv =>
+          right
+          simp [o,Gnotbot,u,v,e,GreedySpannerRec]
 
   | case2 => sorry
   | case3 => sorry
