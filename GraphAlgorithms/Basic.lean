@@ -193,7 +193,7 @@ let G' := G.deleteEdges (E : Set (Edge n))
 
 
 noncomputable def GreedySpannerRec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E_H :Set (Edge n))  (itr target:ℕ)   : FinSimpleGraph n :=
-    if target ≤ itr then fromEdgeSet E_H
+    if target = itr + 1 then fromEdgeSet E_H
     else
     if h: G = emptyGraph (Fin n) then fromEdgeSet E_H
     else
@@ -231,17 +231,78 @@ noncomputable def GreedySpanner   (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
 noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]  :=
   GreedySpannerRec t G {} 0 i
 
+
+--#check GreedySpannerRec.induct
+
 lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
   let H_i := GreedySpanner_itr G t (G.IndexOfEdgeInG e he)
   let u := (Quot.out e).1
   let v := (Quot.out e).2
   H_i.dist u v ≤ 2*t-1 := by sorry
 
+#check GreedySpannerRec.induct
 
 lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
   let H_i := GreedySpanner_itr G t i
-  let H := GreedySpanner G t
-  H_i.IsSubgraph H := by sorry
+  let H_i2 := GreedySpanner_itr G t (i+1)
+  H_i.IsSubgraph H_i2 := by
+
+  simp [GreedySpanner_itr]
+
+  induction G, ({}: Set (Edge n)), 0, i using GreedySpannerRec.induct t with
+  | case1 G_aux E_H_aux itr =>
+    have: fromEdgeSet E_H_aux = GreedySpannerRec t G_aux E_H_aux itr (itr + 1) :=
+      by simp only [GreedySpannerRec, ↓reduceIte]
+    rw [← this]
+
+--    sorry
+
+--    obtain h1 | h2 : ((2*t -1) < (fromEdgeSet E_H_aux).dist u v) ∨ ((2*t -1) ≥ (fromEdgeSet E_H).dist u v) := by exact?
+
+
+
+
+
+
+
+    sorry
+
+
+
+
+
+    --simp [h, GreedySpannerRec]
+
+--    have claim1: (fromEdgeSet E_H_aux) = GreedySpannerRec t G_aux E_H_aux 0 target := by
+      --simp [h,GreedySpannerRec]
+
+
+
+
+
+
+
+
+  | case2 => sorry
+  | case3 => sorry
+  | case4 => sorry
+
+
+
+
+--  induction G, ({}: Set (Edge n)), t, i using GreedySpannerRec.induct t
+
+
+
+--  intro u v h
+--  induction G ({}: Set (Edge n)) t i using GreedySpannerRec.induct t
+
+
+
+--  dsimp [GreedySpannerRec]
+
+
+
 
 lemma greedySpannerSubgraphOf(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
   let H := GreedySpanner G t
