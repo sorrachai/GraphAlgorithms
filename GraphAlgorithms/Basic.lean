@@ -291,7 +291,10 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
           right
           simp [o,Gnotbot,u,v,e,GreedySpannerRec]
 
-  | case2 => sorry
+  | case2 E_H itr traget h =>
+
+
+  sorry
   | case3 => sorry
   | case4 => sorry
 
