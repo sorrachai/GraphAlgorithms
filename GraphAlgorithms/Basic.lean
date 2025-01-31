@@ -191,6 +191,8 @@ lemma cardGDel_eq_cardG_minus_of (G : FinSimpleGraph n) {E : Finset (Edge n)} (h
 let G' := G.deleteEdges (E : Set (Edge n))
 #G'.edgeFinset = #G.edgeFinset - #E := by sorry
 
+-- fold operation
+--
 
 noncomputable def GreedySpannerRec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E_H :Set (Edge n))  (itr target:ℕ)   : FinSimpleGraph n :=
     if target = itr + 1 then fromEdgeSet E_H
@@ -291,11 +293,39 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
           right
           simp [o,Gnotbot,u,v,e,GreedySpannerRec]
 
-  | case2 E_H itr traget h =>
+  | case2 E_H itr target h =>
+    conv =>
+      conv =>
+        left
+        simp [GreedySpannerRec]
+      conv =>
+        right
+        simp [GreedySpannerRec]
+
+  | case3 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
+    rename_i h3 h4
+    have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
+
+    conv =>
+      conv =>
+        left
+        unfold GreedySpannerRec
+        simp [Gnotbot,h1, h2, h3, Gnonempty,u,v,e]
+      conv =>
+        right
+        unfold GreedySpannerRec
+        simp [Gnotbot,h1, h2, h3, Gnonempty,u,v,e]
 
 
-  sorry
-  | case3 => sorry
+    obtain case1 | case2 : target = itr ∨ target ≠ itr := by  exact eq_or_ne target itr
+    swap
+    · simp [case2]
+      simpa [G',e,u,v] using h4
+    ·
+      simp [case1]
+      sorry
+
+
   | case4 => sorry
 
 
