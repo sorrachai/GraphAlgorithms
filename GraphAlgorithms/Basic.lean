@@ -262,14 +262,15 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
       simp only [h]
       obtain target_le_itr | h2 : target ≤ itr ∨ target > itr := by exact le_or_lt target itr
       · -- case 1 is trivial
-        simp [target_le_itr]
+        simp only [add_le_add_iff_right, target_le_itr, ↓reduceIte, le_refl]
 
       · -- now h2
         observe: ¬ (target ≤ itr)
-        simp [this]
+        simp only [add_le_add_iff_right, this, ↓reduceIte, emptyGraph_eq_bot, Set.union_singleton,
+          dite_eq_ite]
         obtain G_empty | G_nonempty : G_aux = (emptyGraph (Fin n)) ∨ G_aux ≠ (emptyGraph (Fin n)) := eq_or_ne G_aux (emptyGraph (Fin n))
         · -- G_empty case
-          simp [G_empty]
+          simp only [G_empty, emptyGraph_eq_bot, ↓reduceDIte, le_refl]
         · -- G_nonempty case
           have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
 
@@ -281,18 +282,18 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
           let v := (Quot.out e).2;
 
           unfold GreedySpannerRec
-          simp [h]
+          simp only [add_le_add_iff_right, h, ↓reduceIte, ge_iff_le]
 
           obtain H1 | H2 : 2 * t - 1 <  (fromEdgeSet E_H_aux).dist u v ∨ 2 * t - 1 ≥ (fromEdgeSet E_H_aux).dist u v := by exact        Nat.lt_or_ge (2 * t - 1) ((fromEdgeSet E_H_aux).dist u v)
           · -- H1 case
-            simp [u,v,e] at H1
-            simp [H1]
+            simp only [u, e, v] at H1
+            simp only [H1, ↓reduceIte, u, v, e]
             refine fromEdgeSet_mono ?_
             aesop
           · -- H2 case
             observe H2: ¬ (2 * t - 1 <  (fromEdgeSet E_H_aux).dist u v )
-            dsimp [u,v,e] at H2
-            simp [H2]
+            dsimp only [u, e, v] at H2
+            simp only [H2, ↓reduceIte, le_refl, u, v, e]
 
   | case2 E_H itr target h =>
     conv =>
@@ -328,9 +329,7 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
   | case4 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
     rename_i h3 h4
     have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
-    have h5: ¬ (target ≤ itr) := by
-      simp [h1]
-      omega
+    have h5: ¬ (target ≤ itr) := by omega
 
     conv =>
       conv =>
