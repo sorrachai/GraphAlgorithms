@@ -268,9 +268,7 @@ lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ )
   | case3 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
     rename_i h3 h4
     have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
-    have h5: ¬ (target ≤ itr) := by
-      simp [h1]
-      omega
+    have h5: ¬ (target+2 ≤ itr) := by omega
 
     conv =>
       conv =>
@@ -287,7 +285,7 @@ lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ )
   | case4 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
     rename_i h3 h4
     have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
-    have h5: ¬ (target ≤ itr) := by omega
+    have h5: ¬ (target+2 ≤ itr) := by omega
 
     conv =>
       conv =>
@@ -299,14 +297,7 @@ lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ )
         right
         unfold GreedySpannerRec
         simp [Gnotbot,h1, h2, h3, h5, Gnonempty,u,v,e]
-
     aesop
-
-
-
-
-
-
 
 
 
