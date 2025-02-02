@@ -195,7 +195,7 @@ let G' := G.deleteEdges (E : Set (Edge n))
 --
 
 noncomputable def GreedySpannerRec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E_H :Set (Edge n))  (itr target:ℕ)   : FinSimpleGraph n :=
-    if target ≤ itr + 1 then fromEdgeSet E_H
+    if target + 1 ≤ itr then fromEdgeSet E_H
     else
     if h: G = emptyGraph (Fin n) then fromEdgeSet E_H
     else
@@ -234,13 +234,81 @@ noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]
   GreedySpannerRec t G {} 0 i
 
 
---#check GreedySpannerRec.induct
+#check GreedySpannerRec.induct
 
-lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
+lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
   let H_i := GreedySpanner_itr G t (G.IndexOfEdgeInG e he)
   let u := (Quot.out e).1
   let v := (Quot.out e).2
-  H_i.dist u v ≤ 2*t-1 := by sorry
+  H_i.dist u v ≤ 2*t-1 := by
+
+  extract_lets H_i u v
+  let H_i_minus := GreedySpanner_itr G t ((G.IndexOfEdgeInG e he)-1)
+  simp [GreedySpanner_itr] at H_i_minus
+
+  simp [H_i,GreedySpanner_itr]
+
+  induction G, ({}: Set (Edge n)), 0, (G.IndexOfEdgeInG e he) using GreedySpannerRec.induct t with
+  | case1 G_aux E_H_aux itr target h =>
+    unfold GreedySpannerRec
+    simp [h]
+    sorry
+
+
+  | case2 E_H itr target h =>
+    conv =>
+      conv =>
+        left
+        simp [GreedySpannerRec]
+      conv =>
+        right
+        simp [GreedySpannerRec]
+    sorry
+
+  | case3 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
+    rename_i h3 h4
+    have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
+    have h5: ¬ (target ≤ itr) := by
+      simp [h1]
+      omega
+
+    conv =>
+      conv =>
+        left
+        unfold GreedySpannerRec
+        simp [Gnotbot,h1, h2, h3, Gnonempty,u,v,e]
+
+      conv =>
+        right
+        unfold GreedySpannerRec
+        simp [Gnotbot,h1, h2, h3, h5, Gnonempty,u,v,e]
+    aesop
+
+  | case4 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
+    rename_i h3 h4
+    have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
+    have h5: ¬ (target ≤ itr) := by omega
+
+    conv =>
+      conv =>
+        left
+        unfold GreedySpannerRec
+        simp [Gnotbot,h1, h2, h3, Gnonempty,u,v,e]
+
+      conv =>
+        right
+        unfold GreedySpannerRec
+        simp [Gnotbot,h1, h2, h3, h5, Gnonempty,u,v,e]
+
+    aesop
+
+
+
+
+
+
+
+
 
 #check GreedySpannerRec.induct
 
@@ -259,20 +327,21 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
         simp [h]
 
       unfold GreedySpannerRec
-      simp only [h]
-      obtain target_le_itr | h2 : target ≤ itr ∨ target > itr := by exact le_or_lt target itr
-      · -- case 1 is trivial
-        simp only [add_le_add_iff_right, target_le_itr, ↓reduceIte, le_refl]
+      conv =>
+        enter [2,1,1]
+        rw [add_assoc]
+        simp
 
-      · -- now h2
-        observe: ¬ (target ≤ itr)
-        simp only [add_le_add_iff_right, this, ↓reduceIte, emptyGraph_eq_bot, Set.union_singleton,
-          dite_eq_ite]
-        obtain G_empty | G_nonempty : G_aux = (emptyGraph (Fin n)) ∨ G_aux ≠ (emptyGraph (Fin n)) := eq_or_ne G_aux (emptyGraph (Fin n))
-        · -- G_empty case
-          simp only [G_empty, emptyGraph_eq_bot, ↓reduceDIte, le_refl]
-        · -- G_nonempty case
+      by_cases h1: target +2 ≤ itr
+      · -- case 1
+        simp [h1]
+      · -- case 2
+        by_cases h2: G_aux = emptyGraph (Fin n)
+        · -- case 2.1
+          simp [h2]
+        · -- case 2.2
           have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
+          simp [h1,h2,Gnotbot]
 
           have Gnonempty:  (edgeFinset G_aux).toList ≠ [] := GreedySpannerRec.proof_1 G_aux (Eq.mpr_not (Eq.refl (G_aux = (emptyGraph (Fin n)))) (of_eq_false (eq_false Gnotbot)))
           simp [Gnotbot]
@@ -281,19 +350,17 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
           let u := (Quot.out e).1;
           let v := (Quot.out e).2;
 
-          unfold GreedySpannerRec
-          simp only [add_le_add_iff_right, h, ↓reduceIte, ge_iff_le]
-
-          obtain H1 | H2 : 2 * t - 1 <  (fromEdgeSet E_H_aux).dist u v ∨ 2 * t - 1 ≥ (fromEdgeSet E_H_aux).dist u v := by exact        Nat.lt_or_ge (2 * t - 1) ((fromEdgeSet E_H_aux).dist u v)
-          · -- H1 case
-            simp only [u, e, v] at H1
-            simp only [H1, ↓reduceIte, u, v, e]
+          by_cases h3: 2 * t - 1 <  (fromEdgeSet E_H_aux).dist u v
+          · -- case 2.2.1
+            simp [h3,e,u,v]
+            unfold GreedySpannerRec
+            simp [h]
             refine fromEdgeSet_mono ?_
             aesop
-          · -- H2 case
-            observe H2: ¬ (2 * t - 1 <  (fromEdgeSet E_H_aux).dist u v )
-            dsimp only [u, e, v] at H2
-            simp only [H2, ↓reduceIte, le_refl, u, v, e]
+          · -- case 2.2.2
+            simp [h3,e,u,v]
+            unfold GreedySpannerRec
+            simp [h]
 
   | case2 E_H itr target h =>
     conv =>
@@ -307,9 +374,7 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
   | case3 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
     rename_i h3 h4
     have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
-    have h5: ¬ (target ≤ itr) := by
-      simp [h1]
-      omega
+    have h5: ¬ (target+2 ≤ itr) := by omega
 
     conv =>
       conv =>
@@ -321,15 +386,17 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
       conv =>
         right
         unfold GreedySpannerRec
+        rw [add_assoc]
+        simp
         simp [Gnotbot,h1, h2, h3, h5, Gnonempty,u,v,e]
         change (GreedySpannerRec t (deleteEdges G_aux {e}) (insert (e) E_H) (itr+1) (target+1))
-
     aesop
 
   | case4 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
     rename_i h3 h4
+
     have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
-    have h5: ¬ (target ≤ itr) := by omega
+    have h5: ¬ (target + 2 ≤ itr) := by omega
 
     conv =>
       conv =>
