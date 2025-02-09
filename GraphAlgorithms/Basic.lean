@@ -258,6 +258,13 @@ noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]
 
 #check GreedySpannerRec.induct
 
+--lemma GreedyItr (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t] (h: 0 < i ) :
+--  let H_i := GreedySpanner_itr G t i
+--  let H_i2 := GreedySpanner_itr G t (i+1)
+--  have h3: (edgeFinset G).toList.length := by aesop
+--  H_i2.edgeSet = H_i.edgeSet ∪ {(edgeFinset G).toList.get ⟨i,h2⟩ } := by sorry
+
+
 lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
   let H_i := GreedySpanner_itr G t i
   let H_i2 := GreedySpanner_itr G t (i+1)
@@ -446,11 +453,6 @@ lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ )
     · -- large dist
       sorry
 
-
-
-
-
-
 lemma greedySpannerSubgraphOf(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
   let H := GreedySpanner G t
   H.IsSubgraph G := by sorry
@@ -460,19 +462,6 @@ lemma greedySpannerSubgraphOf(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
   for e in G.edgeFinset.toList do
     if (2*t -1) < f_H.dist e then f_H := f_H.AddEdge e
   SimpleGraph.fromRel f_H
-
-lemma GreedySpannerPreserveDistanceUB (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
-  let H := GreedySpanner G t
-  let u := (Quot.out e).1
-  let v := (Quot.out e).2
-  H.dist u v ≤ 2*t-1  := by sorry
-
-lemma GreedySpannerPreserveDistanceLB  (G : FinSimpleGraph n)(t :ℕ )[NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
-  let H := GreedySpanner G t
-  let u := (Quot.out e).1
-  let v := (Quot.out e).2
-  G.dist u v ≤ H.dist u v  := by sorry
-
 
 lemma correctnessOfGreedySpanner (G : FinSimpleGraph n) (t : ℕ) [NeZero t]:
   let H := GreedySpanner G t
