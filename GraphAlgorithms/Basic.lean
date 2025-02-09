@@ -96,7 +96,7 @@ noncomputable instance  FinSimpleGraphFintypeInst (n :ℕ ): Fintype (FinSimpleG
 open FinSimpleGraph Std
 
 def FinSimpleGraph.IsSpannerOf   (H G : FinSimpleGraph n)  (t:ℕ)  : Prop :=
-  H.IsSubgraph G ∧ ∀ u v : Fin n, H.dist u v ≤ t * G.dist u v ∧ G.dist u v ≤ H.dist u v
+  H.IsSubgraph G ∧ ∀ u v : Fin n, H.edist u v ≤ t * G.edist u v
 
 lemma num_edges_le_nn   (G :FinSimpleGraph n):  #G.edgeFinset < n*n+1:= by
   calc
@@ -202,11 +202,11 @@ noncomputable def GreedySpannerRec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E
       have Gnonempty: (edgeFinset G).toList ≠ [] := by
         simp only [ne_eq, toList_eq_nil, Set.toFinset_eq_empty, edgeSet_eq_empty]
         exact h
-      let e := G.edgeFinset.toList.head Gnonempty
+      let e : Edge n := G.edgeFinset.toList.head Gnonempty
       let u := (Quot.out e).1
       let v := (Quot.out e).2
       let G' := G.deleteEdges {e}
-      if h_dist: (2*t -1) < (fromEdgeSet E_H).dist u v then
+      if h_dist: (2*t -1) < (fromEdgeSet E_H).edist u v then
         GreedySpannerRec t G' (E_H ∪ {e}) (itr+1) target
       else GreedySpannerRec t G' E_H (itr +1) target
 
@@ -217,13 +217,35 @@ noncomputable def GreedySpannerRec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E
       exact List.head_mem Gnonempty
     )
 
-noncomputable def FinSimpleGraph.IndexOfEdgeInG (G : FinSimpleGraph n) (e : Edge n) (h: e ∈ G.edgeSet) : ℕ :=
+noncomputable def FinSimpleGraph.IndexOfEdgeInG' (G : FinSimpleGraph n) (e : Edge n) (h: e ∈ G.edgeSet) : ℕ :=
   let o := (G.edgeFinset.toList.indexOf? e)
   have: o.isSome := by
     simp [o,List.indexOf?]
     rw [List.findIdx?_isSome]
     aesop
   o.get this
+
+
+noncomputable def FinSimpleGraph.IndexOfEdgeInG (G : FinSimpleGraph n) (e : Edge n) : ℕ := (G.edgeFinset.toList.indexOf e)
+
+
+lemma  FinSimpleGraph.IndexOfEdgeZeroIsHead (G : FinSimpleGraph n) (Gnonempty: (edgeFinset G).toList ≠ []) (e : Edge n) (h1: e ∈ G.edgeSet) (h2: G.IndexOfEdgeInG e = 0) :
+  e = (edgeFinset G).toList.head Gnonempty := by
+  let e' : Edge n := (edgeFinset G).toList.head Gnonempty
+  let l := (edgeFinset G).toList
+  have e_inl: e ∈ l := by aesop
+  have e'_inl: e' ∈ l := by aesop
+  rw [← List.indexOf_inj e_inl e'_inl]
+  simp [IndexOfEdgeInG] at h2
+  have t1: List.indexOf e' l = 0 := by
+    simp [List.indexOf,List.findIdx,List.findIdx.go]
+    rw [List.findIdx.go.eq_def]
+    aesop
+  have t2: List.indexOf e l = 0 := by aesop
+  simp [t1,t2]
+
+
+
 
 --noncomputable def FinSimpleGraph.IndexOfEdge (G : FinSimpleGraph n) (e : Edge n) : ℕ := (G.edgeFinset.toList.indexOf e)
 
@@ -232,73 +254,6 @@ noncomputable def GreedySpanner   (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
 
 noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]  :=
   GreedySpannerRec t G {} 0 i
-
-
-#check GreedySpannerRec.induct
-
-lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
-  let H_i := GreedySpanner_itr G t (G.IndexOfEdgeInG e he)
-  let u := (Quot.out e).1
-  let v := (Quot.out e).2
-  H_i.dist u v ≤ 2*t-1 := by
-
-  extract_lets H_i u v
-  let H_i_minus := GreedySpanner_itr G t ((G.IndexOfEdgeInG e he)-1)
-  simp [GreedySpanner_itr] at H_i_minus
-
-  simp [H_i,GreedySpanner_itr]
-
-  induction G, ({}: Set (Edge n)), 0, (G.IndexOfEdgeInG e he) using GreedySpannerRec.induct t with
-  | case1 G_aux E_H_aux itr target h =>
-    unfold GreedySpannerRec
-    simp [h]
-    sorry
-
-
-  | case2 E_H itr target h =>
-    conv =>
-      conv =>
-        left
-        simp [GreedySpannerRec]
-      conv =>
-        right
-        simp [GreedySpannerRec]
-    sorry
-
-  | case3 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
-    rename_i h3 h4
-    have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
-    have h5: ¬ (target+2 ≤ itr) := by omega
-
-    conv =>
-      conv =>
-        left
-        unfold GreedySpannerRec
-        simp [Gnotbot,h1, h2, h3, Gnonempty,u,v,e]
-
-      conv =>
-        right
-        unfold GreedySpannerRec
-        simp [Gnotbot,h1, h2, h3, h5, Gnonempty,u,v,e]
-    aesop
-
-  | case4 G_aux E_H itr target h1 h2 Gnonempty e u v G' =>
-    rename_i h3 h4
-    have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
-    have h5: ¬ (target+2 ≤ itr) := by omega
-
-    conv =>
-      conv =>
-        left
-        unfold GreedySpannerRec
-        simp [Gnotbot,h1, h2, h3, Gnonempty,u,v,e]
-
-      conv =>
-        right
-        unfold GreedySpannerRec
-        simp [Gnotbot,h1, h2, h3, h5, Gnonempty,u,v,e]
-    aesop
-
 
 
 #check GreedySpannerRec.induct
@@ -341,7 +296,7 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
           let u := (Quot.out e).1;
           let v := (Quot.out e).2;
 
-          by_cases h3: 2 * t - 1 <  (fromEdgeSet E_H_aux).dist u v
+          by_cases h3: 2 * t - 1 <  (fromEdgeSet E_H_aux).edist u v
           · -- case 2.2.1
             simp [h3,e,u,v]
             unfold GreedySpannerRec
@@ -403,6 +358,97 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
         change (GreedySpannerRec t (deleteEdges G_aux {e}) (E_H) (itr+1) (target+1))
 
     aesop
+
+
+lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
+  let H_i := GreedySpanner_itr G t (G.IndexOfEdgeInG e)
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
+  H_i.edist u v ≤ 2*t-1 := by
+
+  observe obs_t: 0 < t
+  extract_lets H_i u v
+  by_cases h_idx: ((G.IndexOfEdgeInG e) = 0)
+  · -- h_inx = 0
+    unfold H_i GreedySpanner_itr GreedySpannerRec
+    by_cases h2: G = emptyGraph (Fin n)
+    · -- case 2.1
+      have: ¬ (⊥ : SimpleGraph (Fin n)).Connected := by aesop
+      aesop
+
+    · -- case 2.2
+      have Gnotbot: G ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
+      simp [h2,Gnotbot]
+
+      have Gnonempty:  (edgeFinset G).toList ≠ [] := GreedySpannerRec.proof_1 G (Eq.mpr_not (Eq.refl (G = (emptyGraph (Fin n)))) (of_eq_false (eq_false Gnotbot)))
+      simp [Gnotbot]
+
+      let e' : Edge n := (edgeFinset G).toList.head Gnonempty;
+      let u' := (Quot.out e').1
+      let v' := (Quot.out e').2
+
+      have eeqe: e = e' := by exact IndexOfEdgeZeroIsHead G Gnonempty e he h_idx
+      have uu' : u = u' := by aesop
+      have vv' : v = v' := by aesop
+      have h_idx': G.IndexOfEdgeInG ((edgeFinset G).toList.head Gnonempty) = 0 := by aesop
+      have h3: 2*t -1 < (fromEdgeSet {}).edist u' v' := by
+        have: (fromEdgeSet {}).edist u' v' = ⊤ := by
+          refine edist_eq_top_of_not_reachable ?_
+          simp only [fromEdgeSet_empty, reachable_bot]
+          rw [← uu',←  vv']
+          have : e = s(u,v) := by aesop
+          have: G.Adj u v := by
+            refine (mem_edgeSet G).mp ?_
+            aesop
+          aesop
+        rw [this]
+        exact Batteries.compareOfLessAndEq_eq_lt.mp rfl
+      simp [h3,e',v',u',eeqe]
+      unfold GreedySpannerRec
+      simp [h_idx,h_idx']
+      show (fromEdgeSet {e'}).edist u v ≤ 2 * ↑t - 1
+      rw [← eeqe]
+      have: (fromEdgeSet {e}).edist u v = 1 := by
+        refine edist_eq_one_iff_adj.mpr ?_
+        aesop
+      rw [this]
+      refine ENat.le_sub_of_add_le_left ?_ ?_
+      aesop
+      ring_nf
+      refine le_mul_of_one_le_left' ?_
+      exact Nat.one_le_cast.mpr obs_t
+
+  · -- h_indx > 0
+    let H_i_minus := GreedySpanner_itr G t ((G.IndexOfEdgeInG e)-1)
+    have hgindex: G.IndexOfEdgeInG e - 1 + 1 =  G.IndexOfEdgeInG e := by  rw [Nat.sub_one_add_one h_idx]
+    by_cases h_i_minus_dist: H_i_minus.edist u v ≤ 2*t - 1
+    · -- small dist
+      have H_i_minus_subgraph_H_i: H_i_minus.IsSubgraph H_i := by
+        have:= greedySpannerItrSubgraph G t ((G.IndexOfEdgeInG e)-1)
+        simp only at this
+        conv at this =>
+          enter [2,3]
+          simp [hgindex]
+        aesop
+
+      have ureachv: H_i_minus.Reachable u v := by
+        refine edist_ne_top_iff_reachable.mp ?_
+        have: (2 * ↑t - 1 : ENat ) < ⊤ := by exact Batteries.compareOfLessAndEq_eq_lt.mp rfl
+        aesop
+--        rw [SimpleGraph.connected_iff_exists_forall_reachable] at hG
+--        obtain ⟨r,hr⟩ := hG
+--        have ru: G.Reachable r u := by exact hr u
+--       have rv: G.Reachable r v := by exact hr v
+--        exact Reachable.trans (id (Reachable.symm ru)) (hr v)
+      calc
+        SimpleGraph.edist H_i u v ≤  SimpleGraph.edist H_i_minus u v  := SimpleGraph.edist_anti H_i_minus_subgraph_H_i
+        _ ≤ 2 * ↑t - 1  := h_i_minus_dist
+    · -- large dist
+      sorry
+
+
+
+
 
 
 lemma greedySpannerSubgraphOf(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
