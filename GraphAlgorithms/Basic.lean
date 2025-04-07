@@ -305,8 +305,22 @@ noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]
 
 
 
-lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
+lemma greedySpanneri_vs_i_plus'(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
   let H_i  := GreedySpanner.Rec t G {} 0 i --GreedySpanner_itr G t i
+  let H := GreedySpanner G t
+  let e := G.edgeFinset.toList.get ⟨i,hi1⟩
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
+  if (2*t -1) < H_i.edist u v then   e ∈ H.edgeSet
+  else  e ∉ H.edgeSet :=  by
+  sorry
+
+
+
+#check Nat.twoStepInduction
+
+lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
+  let H_i  := GreedySpanner.Rec t G {} 0 i -- GreedySpanner_itr G t i
   let H_i2 := GreedySpanner.Rec t G {} 0 (i+1) --  GreedySpanner_itr G t (i+1)
   let e := G.edgeFinset.toList.get ⟨i,hi1⟩
   let u := (Quot.out e).1
@@ -315,24 +329,34 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
   else  H_i = H_i2 :=  by
 
   extract_lets H_i H_i2 e u v
+
+  have:= aux i (by rfl)
+  extract_lets G' at this
+  obtain ⟨E',⟨h1,h2⟩ ⟩ := this
   simp [H_i,H_i2]
 
-  --trace_state
-
-  induction i with
-  | zero => sorry
-  | succ i ih =>
-  conv =>
-    conv =>
-      enter [2,1,1,5]
-      rw [add_assoc]
-      simp
-    conv =>
-      enter [3,2,5]
-      rw [add_assoc]
-      simp
-
   sorry
+
+
+  where
+  aux (itr :ℕ) (h: itr ≤ i):
+    let G' := fromEdgeSet (G.edgeFinset.toList.drop itr).toFinset.toSet
+    ∃ E' : Set (Edge n),
+    GreedySpanner.Rec t G {} 0 i     = GreedySpanner.Rec t G' E' itr i ∧  -- GreedySpanner_itr G t i
+    GreedySpanner.Rec t G {} 0 (i+1) = GreedySpanner.Rec t G' E' itr (i+1) := by
+   extract_lets G'
+   induction itr with
+   | zero =>
+     have: G' = G := by aesop
+     rw [this]
+     use {}
+   | succ itr ih => sorry
+
+
+  -- extract_lets H_i H_i2 e u v
+  -- simp [H_i,H_i2]
+  -- trace_state
+
 
 
 
