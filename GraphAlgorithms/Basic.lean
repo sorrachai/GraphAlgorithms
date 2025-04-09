@@ -17,51 +17,6 @@ import Mathlib.Data.Fintype.Basic
 
 set_option autoImplicit false
 
-def NonTail.sum : List Nat → Nat
-  | [] => 0
-  | x :: xs => x + sum xs
-
-#eval NonTail.sum [1, 2, 3]
-
-def Tail.sum (xs : List Nat) : Nat :=
-  sumHelper 0 xs
-  where sumHelper (soFar : Nat) : List Nat → Nat
-  | [] => soFar
-  | x :: xs => sumHelper (x + soFar) xs
-
-#eval Tail.sum [1,2,3]
-
-theorem helper_add_sum_accum (xs : List Nat) (n : Nat) :
-    n + NonTail.sum xs = Tail.sum.sumHelper n xs := by
-  induction xs generalizing n with
-  | nil =>
-    rfl
-  | cons y ys is =>
-    simp [NonTail.sum,Tail.sum,Tail.sum.sumHelper]
-    rw [← add_assoc]
-    conv =>
-      left
-      left
-      rw [add_comm]
-    exact is (y + n)
-  skip
-
-
-theorem non_tail_sum_eq_tail_sum : NonTail.sum = Tail.sum := by
-  funext xs
-  induction xs with
-  | nil =>
-    rfl
-  | cons y ys is =>
-    simp [NonTail.sum,Tail.sum,Tail.sum.sumHelper]
-    exact helper_add_sum_accum ys y
-
-
-
-
-
-
-
 open Classical
 universe u u'
 
@@ -320,66 +275,8 @@ lemma greedySpanneri_vs_i_plus'(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeF
 
 #check Nat.twoStepInduction
 
-
-lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
-  let H_i  := GreedySpanner.Rec t G {} 0 i -- GreedySpanner_itr G t i
-  let H_i2 := GreedySpanner.Rec t G {} 0 (i+1) --  GreedySpanner_itr G t (i+1)
-  let e := G.edgeFinset.toList.get ⟨i,hi1⟩
-  let u := (Quot.out e).1
-  let v := (Quot.out e).2
-  if (2*t -1) < H_i.edist u v then   H_i2.edgeSet =  H_i.edgeSet ∪ {e}
-  else  H_i = H_i2 :=  by
-
-  extract_lets H_i H_i2 e u v
-
-  have:= aux i (by rfl)
-  extract_lets G' at this
-  obtain ⟨E',⟨h1,h2⟩ ⟩ := this
-  simp [H_i,H_i2]
-  have: GreedySpanner.Rec t G' E' i i = fromEdgeSet E' := by
-    simp [GreedySpanner.Rec]
-  rw [this] at h1
-
-  have G'_nonempty: ¬ (G' = (⊥ : SimpleGraph (Fin n))):= by sorry
-  observe: ¬ (i+1 ≤ i)
-  have non_base_p: ¬ (i+1 ≤ i ∨ G' = (⊥ : SimpleGraph (Fin n))) := by
-    push_neg
-    constructor
-    omega
-    exact G'_nonempty
-
---  have nonbase: ¬ (i ≤ i ∨ G' = emptyGraph (Fin n)):= by aesop
-  conv at h2 =>
-    right
-    unfold GreedySpanner.Rec
-    simp [non_base_p,G'_nonempty]
-
-  have Gnonempty : (@edgeFinset (Fin n) G' G'.fintypeEdgeSet).toList ≠ []  := GreedySpanner.Rec.proof_1 G' i (i+1) (of_eq_false (eq_false non_base_p))
-  have Gnonempty2 : G'.edgeFinset.toList ≠ [] := sorry
-
---  G_ih.edgeFinset.toList.head
-  let e' := (@edgeFinset (Fin n) G' G'.fintypeEdgeSet).toList.head Gnonempty;
---     let e := G_ih.edgeFinset.toList.head Gnonempty;
-  have eeqe': e = e' := sorry
-  let u' := (Quot.out e').1;
-  let v' := (Quot.out e').2;
-  let G'' := G'.deleteEdges {e'}
-  obtain ⟨uu',vv'⟩ : u = u' ∧ v = v' := sorry
---  obtain ⟨ ⟩ : u' = u ∧ v' = v ∧ G''
-
-  by_cases h_distance: 2 * ↑t - 1 < (fromEdgeSet E').edist u' v'
-
-  conv at h2 =>
-    right
-    unfold GreedySpanner.Rec
-    simp [h_distance, e',u',v']
-
-
-
-  rw [h1,uu',vv',eeqe']
-  simp only [h_distance, ↓reduceIte, H_i, H_i2]
-  rw [h2]
-  simp only [e',edgeSet_fromEdgeSet, H_i, H_i2, insert,Set.insert]
+lemma  insert_an_edge_diff_ordering (E : Set (Edge n)) {e : Edge n} (h1: ¬e.IsDiag)
+: (fromEdgeSet ({e} ∪ E)).edgeSet = {e} ∪ (fromEdgeSet E).edgeSet := by
   refine Set.ext ?_
   intro x
   constructor
@@ -391,37 +288,84 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
   obtain l | r := h
   constructor
   simp [l]
-  refine Set.mem_setOf.mpr ?_
-  left
-  simp
-  have: x ∈ G'.edgeFinset := sorry
-  exact SimpleGraph.not_isDiag_of_mem_edgeFinset this
+  exact Eq.mpr_not (congrArg Sym2.IsDiag l) h1
   obtain ⟨hr1,hr2⟩ := r
   refine ⟨?_ ,hr2⟩
   refine Set.mem_setOf.mpr ?_
   right
   exact hr1
 
-  conv at h2 =>
-    right
-    unfold GreedySpanner.Rec
-    simp [h_distance, e',u',v']
+lemma G_list_non_empty_of_drop_lt_num_edges (G : FinSimpleGraph n){i : ℕ }(h: i < G.edgeFinset.toList.length):
+   (G.edgeFinset.toList.drop i) ≠ [] := by simp_all only [length_toList, Set.toFinset_card, Fintype.card_ofFinset,
+     ne_eq, List.drop_eq_nil_iff, not_le]
 
-  rw [h1,uu',vv',eeqe']
-  simp only [h_distance, ↓reduceIte, H_i, H_i2]
-  rw [h2]
+lemma G_non_empty_of_drop_lt_num_edges (G : FinSimpleGraph n){i : ℕ }(h: i < G.edgeFinset.toList.length):
+  fromEdgeSet (G.edgeFinset.toList.drop i).toFinset.toSet ≠ (⊥ : SimpleGraph (Fin n)) := by
+
+  have drop_nonempty_list: (edgeFinset G).toList.drop i ≠ [] := by aesop
+  have drop_nonempty: ((edgeFinset G).toList.drop i).toFinset ≠ {} := by aesop
+  refine edgeSet_nonempty.mp ?_
+  rw [@edgeSet_fromEdgeSet]
+
+  have H': ∀ e ∈ (List.drop i (edgeFinset G).toList).toFinset, ¬e.IsDiag := by
+    intro e he
+    suffices e ∈ G.edgeFinset from  SimpleGraph.not_isDiag_of_mem_edgeFinset this
+    refine mem_toList.mp ?_
+    rw [@List.mem_toFinset] at he
+    exact List.mem_of_mem_drop he
+
+  have: ((edgeFinset G).toList.drop i).toFinset \ ({e : Edge n| e.IsDiag} : Finset (Sym2 (Fin n)) ) ≠ {} := by
+    let e' := (List.drop i (edgeFinset G).toList).head drop_nonempty_list
+    have: e' ∈ (List.drop i (edgeFinset G).toList).toFinset := by
+      rw [@List.mem_toFinset]
+      exact List.head_mem drop_nonempty_list
+    have e'_not_diag: ¬ e'.IsDiag :=  H' e' this
+    have e'_not_in_diag_set: e' ∉ ({ e : Sym2 (Fin n) | e.IsDiag} : Finset (Sym2 (Fin n))):= by
+      rw [@mem_filter]
+      push_neg
+      intro h
+      exact H' e' this
+    have: e' ∈ ((List.drop i (edgeFinset G).toList).toFinset  \ ({ e : Sym2 (Fin n) | e.IsDiag} : Finset (Sym2 (Fin n)))  ) := by
+      refine mem_sdiff.mpr ?_
+      exact Decidable.not_imp_iff_and_not.mp fun a ↦ e'_not_in_diag_set (a this)
+    exact ne_empty_of_mem this
+
+  convert this
+  constructor
+  · intro h1
+    aesop
+  · intro h2
+    refine Set.diff_nonempty.mpr ?_
+    refine Set.not_subset.mpr ?_
+    let e := ((edgeFinset G).toList.drop i).head drop_nonempty_list
+
+    use e
+    constructor
+    · have: e ∈ ↑(List.drop i (edgeFinset G).toList).toFinset ↔ e ∈ ↑(List.drop i (edgeFinset G).toList) :=  List.mem_toFinset
+      rw [@mem_coe]
+      rw [this]
+      exact List.head_mem drop_nonempty_list
+    · suffices e ∈ (List.drop i (edgeFinset G).toList).toFinset from H' e this
+      rw [@List.mem_toFinset]
+      exact List.head_mem drop_nonempty_list
 
 
 
+/- lemma G_ip_eq_G_i_minus_e (G :FinSimpleGraph n){i : ℕ} (h: i < G.edgeFinset.toList.length):
+  let G_i : SimpleGraph (Fin n) := fromEdgeSet ↑(List.drop i (edgeFinset G).toList).toFinset;
+  have Gnonempty:  G_i.edgeFinset.toList ≠ [] := by
+    have: G_i ≠ (⊥ : SimpleGraph (Fin n)) := by exact G_non_empty_of_drop_lt_num_edges G h
+    rw [← @edgeFinset_nonempty] at this
+    exact Nonempty.toList_ne_nil this
+  let e : Sym2 (Fin n) := G_i.edgeFinset.toList.head Gnonempty;
+  let G_i_minus_e  : SimpleGraph (Fin n) := G_i.deleteEdges {e};
+  let G_ip : SimpleGraph (Fin n) := fromEdgeSet ↑(List.drop (i + 1) (edgeFinset G).toList).toFinset;
+  G_ip = G_i_minus_e  := sorry-/
 
---  have: G'' = G' := sorry
+     -- this : G'' = G'
 
 
- -- by_cases
-
-
-  where
-  aux (itr :ℕ) (h: itr ≤ i):
+lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](itr :ℕ) (h: itr ≤ i) (hi1: i < G.edgeFinset.toList.length):
     let G' := fromEdgeSet (G.edgeFinset.toList.drop itr).toFinset.toSet
     ∃ E' : Set (Edge n),
     GreedySpanner.Rec t G {} 0 i     = GreedySpanner.Rec t G' E' itr i ∧  -- GreedySpanner_itr G t i
@@ -439,7 +383,8 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
      extract_lets G_ih at ih
      obtain ⟨E_ih,⟨ ih_itr_i, ih_itr_ip⟩⟩ := ih
 
-     have Gih_nonempty: ¬ (G_ih = (⊥ : SimpleGraph (Fin n))):= by sorry
+     have Gih_nonempty: ¬ (G_ih = (⊥ : SimpleGraph (Fin n))):= G_non_empty_of_drop_lt_num_edges G (Nat.lt_of_le_of_lt this hi1)
+
      observe: ¬ (i < itr)
 
      have non_base  : ¬ (i ≤ itr   ∨ G_ih = (⊥ : SimpleGraph (Fin n))) := by aesop
@@ -451,13 +396,68 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
 
 
      have Gnonempty : (@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).toList ≠ []  := GreedySpanner.Rec.proof_1 G_ih itr i (of_eq_false (eq_false non_base))
-   --  G_ih.edgeFinset.toList.head
+--
      let e := (@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).toList.head Gnonempty;
---     let e := G_ih.edgeFinset.toList.head Gnonempty;
+--
      let u := (Quot.out e).1
      let v := (Quot.out e).2
      let G'' := G_ih.deleteEdges {e}
-     have: G'' = G' := sorry
+     have: G'' = G' := by
+
+     -- have: (List.drop itr (edgeFinset G).toList).diff [e] = (List.drop (itr+1) (edgeFinset G).toList) := sorry
+
+      ext x y
+
+      let l1 := List.drop itr (edgeFinset G).toList
+      let l1p := List.drop (itr+1) (edgeFinset G).toList
+      have l1_nodup: l1.Nodup := by
+        have list_from_G_nodup := (edgeFinset G).nodup_toList
+        have l1_subseteq_list_from_G: l1.Sublist (edgeFinset G).toList := List.drop_sublist itr (edgeFinset G).toList--List.drop_subset itr (edgeFinset G).toList
+        exact List.Sublist.nodup l1_subseteq_list_from_G list_from_G_nodup
+
+      let le : List (Sym2 (Fin n)):= [e]
+
+      have ldrop_eq_l1diffl2 :  l1p = l1.diff le := by
+--        suffices
+        simp [l1p,le]
+        rw [← List.drop_drop]
+        change List.drop 1 (l1) = l1.erase e
+        rw [@List.drop_one]
+        --have: l1.head ?_ = e := by
+
+
+        sorry
+
+      constructor
+      ·
+        simp [G',G'']
+        intro h1 h2
+        have xyinl1: s(x,y) ∈  l1 := by aesop_graph
+        have xyinl1_minus_e: s(x,y) ∈  l1.diff le := by
+           have: s(x,y) ∈ l1.diff le ↔ s(x,y) ∈ l1 ∧ s(x,y) ∉ le  := List.Nodup.mem_diff_iff l1_nodup
+           rw [this]
+           refine ⟨xyinl1, ?_⟩
+           simp [le,h2]
+        constructor
+        · aesop
+        · aesop_graph
+      ·
+        simp [G',G'']
+        intro h1 h2
+        have: s(x, y) ∈ l1 := by
+          suffices l1p ⊆ l1 by aesop
+          apply List.drop_subset_drop_left
+          omega
+        constructor
+        · aesop
+        ·
+          conv at h1 =>
+            left
+            change l1p
+            rw [ldrop_eq_l1diffl2]
+          rw [propext (List.Nodup.mem_diff_iff l1_nodup)] at h1
+          obtain ⟨_,h3⟩ := h1
+          exact List.ne_of_not_mem_cons h3
 
      conv at ih_itr_i =>
       right
@@ -481,6 +481,146 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
       simp [h_distance,u,v,e] at ih_itr_ip
       use E_ih
       exact ⟨by aesop, by aesop⟩
+
+lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
+  let H_i  := GreedySpanner.Rec t G {} 0 i -- GreedySpanner_itr G t i
+  let H_i2 := GreedySpanner.Rec t G {} 0 (i+1) --  GreedySpanner_itr G t (i+1)
+  let e := G.edgeFinset.toList.get ⟨i,hi1⟩
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
+  if (2*t -1) < H_i.edist u v then   H_i2.edgeSet =  H_i.edgeSet ∪ {e}
+  else  H_i = H_i2 :=  by
+
+  extract_lets H_i H_i2 e u v
+
+  have:= greedySpanneri_vs_i_plus_aux G t i i (by rfl) hi1
+
+  extract_lets G' at this
+  obtain ⟨E',⟨h1,h2⟩ ⟩ := this
+  simp [H_i,H_i2]
+  have: GreedySpanner.Rec t G' E' i i = fromEdgeSet E' := by
+    simp [GreedySpanner.Rec]
+  rw [this] at h1
+
+  have G'_nonempty: ¬ (G' = (⊥ : SimpleGraph (Fin n))):= G_non_empty_of_drop_lt_num_edges G hi1
+  observe: ¬ (i+1 ≤ i)
+  have non_base_p: ¬ (i+1 ≤ i ∨ G' = (⊥ : SimpleGraph (Fin n))) := by
+    push_neg
+    constructor
+    omega
+    exact G'_nonempty
+
+  conv at h2 =>
+    right
+    unfold GreedySpanner.Rec
+    simp [non_base_p,G'_nonempty]
+
+  have Gnonempty : (@edgeFinset (Fin n) G' G'.fintypeEdgeSet).toList ≠ []  := GreedySpanner.Rec.proof_1 G' i (i+1) (of_eq_false (eq_false non_base_p))
+
+  let e' := (@edgeFinset (Fin n) G' G'.fintypeEdgeSet).toList.head Gnonempty
+  let u' := (Quot.out e').1
+  let v' := (Quot.out e').2
+  let G'' := G'.deleteEdges {e'}
+
+  obtain ⟨uu',vv', ee'⟩ : u = u' ∧ v = v' ∧ e = e' := by
+    suffices ee': e = e' by aesop
+    sorry
+
+
+  by_cases h_distance: 2 * ↑t - 1 < (fromEdgeSet E').edist u' v'
+
+  · -- if 2 * ↑t - 1 < (fromEdgeSet E').edist u' v'
+    conv at h2 =>
+      right
+      unfold GreedySpanner.Rec
+      simp [h_distance, e',u',v']
+
+    rw [h1,uu',vv',ee']
+    simp only [h_distance, ↓reduceIte, H_i, H_i2]
+    rw [h2]
+
+    change (fromEdgeSet ( {e'} ∪ E')).edgeSet =  {e'} ∪  (fromEdgeSet E').edgeSet
+
+    have: ¬e'.IsDiag := by
+      suffices e' ∈ G'.edgeFinset from  SimpleGraph.not_isDiag_of_mem_edgeFinset this
+      have: e' ∈ G'.edgeFinset.toList:= by
+        have:= List.head_mem Gnonempty
+        convert this
+      exact mem_toList.mp this
+
+    refine insert_an_edge_diff_ordering E' this
+
+  · -- else
+    conv at h2 =>
+      right
+      unfold GreedySpanner.Rec
+      simp [h_distance, e',u',v']
+
+    rw [h1,uu',vv',ee']
+    simp only [h_distance, ↓reduceIte, H_i, H_i2]
+    rw [h2]
+
+  -- where
+  -- aux (itr :ℕ) (h: itr ≤ i):
+  --   let G' := fromEdgeSet (G.edgeFinset.toList.drop itr).toFinset.toSet
+  --   ∃ E' : Set (Edge n),
+  --   GreedySpanner.Rec t G {} 0 i     = GreedySpanner.Rec t G' E' itr i ∧  -- GreedySpanner_itr G t i
+  --   GreedySpanner.Rec t G {} 0 (i+1) = GreedySpanner.Rec t G' E' itr (i+1) := by sorry
+
+--    extract_lets G'
+--    induction itr with
+--    | zero =>
+--      have: G' = G := by aesop
+--      rw [this]
+--      use {}
+--    | succ itr ih =>
+--      observe: itr ≤ i
+--      replace ih:= ih this
+--      extract_lets G_ih at ih
+--      obtain ⟨E_ih,⟨ ih_itr_i, ih_itr_ip⟩⟩ := ih
+
+--      have Gih_nonempty: ¬ (G_ih = (⊥ : SimpleGraph (Fin n))):= by sorry
+--      observe: ¬ (i < itr)
+
+--      have non_base  : ¬ (i ≤ itr   ∨ G_ih = (⊥ : SimpleGraph (Fin n))) := by aesop
+--      have non_base_p: ¬ (i+1 ≤ itr ∨ G_ih = (⊥ : SimpleGraph (Fin n))) := by
+--       push_neg
+--       constructor
+--       omega
+--       exact Gih_nonempty
+
+
+--      have Gnonempty : (@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).toList ≠ []  := GreedySpanner.Rec.proof_1 G_ih itr i (of_eq_false (eq_false non_base))
+-- --
+--      let e := (@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).toList.head Gnonempty;
+-- --
+--      let u := (Quot.out e).1
+--      let v := (Quot.out e).2
+--      let G'' := G_ih.deleteEdges {e}
+--      have: G'' = G' := sorry
+
+--      conv at ih_itr_i =>
+--       right
+--       unfold GreedySpanner.Rec
+--       simp [non_base]
+
+--      conv at ih_itr_ip =>
+--       right
+--       unfold GreedySpanner.Rec
+--       simp [non_base_p]
+
+--      by_cases h_distance: 2 * ↑t - 1 < (fromEdgeSet E_ih).edist u v
+--      ·
+--       simp [h_distance,u,v,e] at ih_itr_i
+--       simp [h_distance,u,v,e] at ih_itr_ip
+
+--       use (insert e E_ih)
+--       exact ⟨by aesop, by aesop⟩
+--      ·
+--       simp [h_distance,u,v,e] at ih_itr_i
+--       simp [h_distance,u,v,e] at ih_itr_ip
+--       use E_ih
+--       exact ⟨by aesop, by aesop⟩
 
 lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
   let H_i := GreedySpanner_itr G t i
@@ -565,8 +705,6 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
     rename_i h3 h4
 
     have Gnotbot: G_aux ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
---    have h5: ¬ (target + 2 ≤ itr) := by omega
-
     have H: ¬ (target ≤ itr) := by aesop
     have H': ¬ (target +1 ≤ itr) := by omega
 
