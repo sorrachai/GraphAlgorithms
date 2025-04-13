@@ -12,14 +12,9 @@ import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
 import Mathlib.Combinatorics.SimpleGraph.Girth
 import Mathlib.Combinatorics.SimpleGraph.Operations
 import Mathlib.Combinatorics.SimpleGraph.Basic
-import «GraphAlgorithms».PreMathlib
---import Mathlib.Data.Fin.Rev
-
-
-
---#check Sym2.Mem.other
+import Mathlib.Data.Fintype.Basic
 --import Mathlib.Algebra.Order.Monoid.Unbundled.Basic
-set_option maxHeartbeats 500000
+
 set_option autoImplicit false
 
 open Classical
@@ -120,9 +115,9 @@ lemma num_edges_le_nn   (G :FinSimpleGraph n):  #G.edgeFinset < n*n+1:= by
       simp
 
 noncomputable def FinSimpleGraph.numEdges  (G : FinSimpleGraph n) : ℕ := #G.edgeFinset
-noncomputable def exGirth (n t:ℕ) [NeZero n]  : ℕ := sup {H : FinSimpleGraph n | 2*t + 1 ≤ H.girth } numEdges
+noncomputable def exGirth (n t:ℕ)  : ℕ := sup {H : FinSimpleGraph n | 2*t + 1 ≤ H.girth } numEdges
 
-lemma exGirthUB (n t:ℕ) [NeZero n]: exGirth n t ≤ 100 * n * (NNReal.rpow ↑n (1/(↑t))) := sorry
+lemma exGirthUB (n t:ℕ) : exGirth n t ≤ 100 * n * (NNReal.rpow ↑n (1/(↑t))) := sorry
 
 def BinarySqMatrix.AddEdge  (M : BinarySqMatrix n) ( e : Sym2 (Fin n) ):
  Fin n → Fin n → Prop := fun (i j : Fin n) ↦ M i j ∨ (e = s(i,j))
@@ -195,81 +190,23 @@ example  (G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
     exact h
 
 
--- -- A nice lemma to prove, but no need for now.
--- lemma cardGDel_eq_cardG_minus_of (G : FinSimpleGraph n) {E : Finset (Edge n)} (h: E ⊆  G.edgeFinset) :
--- let G' := G.deleteEdges (E : Set (Edge n))
--- #G'.edgeFinset = #G.edgeFinset - #E := by sorry
+-- A nice lemma to prove, but no need for now.
+lemma cardGDel_eq_cardG_minus_of (G : FinSimpleGraph n) {E : Finset (Edge n)} (h: E ⊆  G.edgeFinset) :
+let G' := G.deleteEdges (E : Set (Edge n))
+#G'.edgeFinset = #G.edgeFinset - #E := by sorry
 
 -- fold operation
---instance instBoundedOrder [NeZero n]: OrderTop (Fin n) := Fintype.toOrderTop (Fin n)
-
-def lex : Sym2 (Fin n) → Sym2 (Fin n) → Prop := fun x ↦ fun y ↦  x.inf < y.inf ∨ (x.inf = y.inf ∧ x.sup ≤ y.sup) --x.inf + x.sup*(n) ≤ y.inf + y.sup*(n)
-
-noncomputable instance IsTransSym2 (n:ℕ):  IsTrans (Sym2 (Fin n)) lex := by
-  refine { trans := ?_ }
-  intro a b c hab hbc
-  simp_all [lex]
-  by_cases abinf: a.inf < b.inf <;> by_cases bcinf: b.inf < c.inf
-  · simp_all
-    left
-    exact Fin.lt_trans abinf bcinf
-  · aesop
-  · simp_all
-  · simp [abinf] at hab
-    simp [bcinf] at hbc
-    right
-    constructor
-    aesop
-    replace hab:= hab.right
-    replace hbc:= hbc.right
-    exact Fin.le_trans hab hbc
-
-noncomputable instance IsAntisymmSym2 (n:ℕ):  IsAntisymm (Sym2 (Fin n)) lex := by
-  refine { antisymm := ?_ }
-  intro a b h1 h2
-  simp_all [lex]
-  by_cases h_lt: a.inf < b.inf
-  simp_all
-  observe: ¬ (b.inf < a.inf)
-  simp [this] at h2
-  aesop
-  obtain H | H' : a.inf = b.inf ∨ b.inf < a.inf  := by exact eq_or_lt_of_not_lt h_lt
-  swap
-  aesop
-  simp_all
-  observe: a.sup = b.sup
-  rw [@Sym2.eq_iff_inf_sup]
-  exact Prod.ext H this
-
-noncomputable instance IsTotalSym2 (n:ℕ):  IsTotal (Sym2 (Fin n)) lex := by
-  refine { total := ?_ }
-  intro a b
-  by_cases h: lex a b
-  exact Or.symm (Or.inr h)
-  right
-  simp [lex] at h
-  simp [lex]
-  obtain ⟨h1,h2⟩ := h
-  by_cases h:b.inf < a.inf
-  left
-  exact h
-  push_neg at h
-  right
-  constructor
-  aesop (add unsafe Fin.le_antisymm)
-  have: b.sup < a.sup := by aesop (add unsafe Fin.le_antisymm)
-  exact Fin.le_of_lt this
-
+--
 noncomputable def GreedySpanner (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
   Rec t G {} 0 #G.edgeFinset
   where
   Rec (t :ℕ)[NeZero t]  (G : FinSimpleGraph n) (E_H :Set (Edge n))  (itr target:ℕ)   : FinSimpleGraph n :=
     if h: target ≤ itr ∨ G = emptyGraph (Fin n) then fromEdgeSet E_H
     else
-      have G_sort_non_empty :sort lex (edgeFinset G) ≠ []:= by
-        rw [← @List.toFinset_nonempty_iff]
-        aesop
-      let e : Edge n := (G.edgeFinset.sort lex).head G_sort_non_empty
+      have Gnonempty: (edgeFinset G).toList ≠ [] := by
+        simp only [ne_eq, toList_eq_nil, Set.toFinset_eq_empty, edgeSet_eq_empty]
+        simp_all only [emptyGraph_eq_bot, not_or, not_le, not_false_eq_true]
+      let e : Edge n := G.edgeFinset.toList.head Gnonempty
       let u := (Quot.out e).1
       let v := (Quot.out e).2
       let G' := G.deleteEdges {e}
@@ -280,8 +217,8 @@ noncomputable def GreedySpanner (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
     termination_by #G.edgeFinset decreasing_by all_goals (
       apply cardGDel_lt_cardG_of G
       apply mem_edgeFinset.mp
-      rw [← Finset.mem_sort lex]
-      exact List.head_mem G_sort_non_empty
+      apply mem_toList.mp
+      exact List.head_mem Gnonempty
     )
 
 
