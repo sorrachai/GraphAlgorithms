@@ -238,7 +238,7 @@ noncomputable instance IsAntisymmSym2 (n:ℕ):  IsAntisymm (Sym2 (Fin n)) lex :=
   aesop
   simp_all
   observe: a.sup = b.sup
-  rw [@Sym2.eq_iff_inf_sup]
+  rw [@Sym2.eq_iff_inf_sup_eq]
   exact Prod.ext H this
 
 noncomputable instance IsTotalSym2 (n:ℕ):  IsTotal (Sym2 (Fin n)) lex := by

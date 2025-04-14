@@ -6,9 +6,9 @@ import Mathlib.Data.Fintype.Order
 import Mathlib.Data.Multiset.Lattice
 
 
-
 variable {α}
-theorem Sym2.eq_iff_inf_sup [LinearOrder α] (x y : Sym2 (α)) : x = y ↔ (x.inf,x.sup) = (y.inf,y.sup) := by
+
+theorem Sym2.eq_iff_inf_sup_eq [LinearOrder α] (x y : Sym2 (α)) : x = y ↔ (x.inf,x.sup) = (y.inf,y.sup) := by
   constructor
   ·
     rw [@Sym2.ext_iff]
