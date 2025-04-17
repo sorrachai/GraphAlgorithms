@@ -129,12 +129,15 @@ noncomputable def BinarySqMatrix.dist (M : BinarySqMatrix n) (e : Sym2 (Fin n)):
 lemma cardGDel_lt_cardG_of' (G : FinSimpleGraph n) { e : Edge n} (h:  e ∈ G.edgeSet):
   let G' := G.deleteEdges {e}
   G' < G := by
+  simp
   constructor
-  aesop_graph
+  · aesop_graph
+
   refine not_le_of_lt ?_
   rw [@Pi.lt_def]
   constructor
-  aesop_graph
+  · aesop_graph
+
   let u := (Quot.out e).1
   let v := (Quot.out e).2
   use u
@@ -143,15 +146,13 @@ lemma cardGDel_lt_cardG_of' (G : FinSimpleGraph n) { e : Edge n} (h:  e ∈ G.ed
   aesop_graph
   use v
 
-  simp only [deleteEdges_adj, Set.mem_singleton_iff]
-  have x: s(u,v) = e := by aesop
-  have: (¬ s(u,v) = e) = False := by aesop
-  rw [this]
-  simp only [and_false, gt_iff_lt]
 
+
+  simp only [deleteEdges_adj, Set.mem_singleton_iff]
+  have h': ¬ (G.Adj u v ∧ ¬s(u, v) = e) := by aesop
   suffices  G.Adj u v by
     simp only [gt_iff_lt]
-    exact lt_of_le_not_le (fun a ↦ this) fun a ↦ a this
+    exact lt_of_le_not_le (fun a ↦ this) fun a ↦ h' (a this)
   rw [@adj_iff_exists_edge_coe]
   aesop
 
@@ -161,8 +162,9 @@ lemma cardGDel_lt_cardG_of (G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeS
 
   extract_lets G'
   have: G' < G := cardGDel_lt_cardG_of' G h
-  suffices G'.edgeFinset ⊂ G.edgeFinset from card_lt_card this
-  aesop
+  suffices H: G'.edgeFinset ⊂ G.edgeFinset by
+    exact card_lt_card H
+  exact edgeFinset_strict_mono this
 
 example  (G : FinSimpleGraph n) {e : Edge n} (h: e ∈ G.edgeSet):
   let G' := G.deleteEdges {e}

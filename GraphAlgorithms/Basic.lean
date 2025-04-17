@@ -29,6 +29,41 @@ def BinaryMatrix' (m : Type u) (n : Type u') := Matrix m n Prop
 def BinaryMatrix (m n: ℕ ) := BinaryMatrix' (Fin m) (Fin n)
 def BinarySqMatrix (n: ℕ ) := BinaryMatrix n n
 
+--import Mathlib.Data.Nat.Choose.Basic -- Need this for n.choose and related lemmas
+
+lemma two_mul_choose_two_cancel' (n : ℕ) : 2 * n.choose 2 = n * (n - 1) := by
+  rw [Nat.choose_two_right n] -- State: 2 * (n * (n - 1) / 2) = n * (n - 1)
+
+  -- Prove explicitly that 2 divides n * (n - 1)
+  have h_div : 2 ∣ n * (n - 1) := by
+    rcases Nat.even_or_odd n with h_even | h_odd -- Split proof based on parity of n
+    · -- Case 1: n is even
+      -- If n is even, then 2 ∣ n.
+      -- If 2 ∣ n, then 2 ∣ n * m for any m.
+      apply dvd_mul_of_dvd_left -- Use the tactic: if a ∣ b, then a ∣ b * c
+      -- We need to supply the proof that 2 ∣ n.
+      -- The definition of Even n is n % 2 = 0. The lemma `Nat.even_iff_two_dvd` converts this to 2 ∣ n.
+      exact even_iff_two_dvd.mp h_even
+--      exact even_iff_two_dvd.mp h_even
+    · -- Case 2: n is odd
+      -- If n is odd, then n - 1 is even, so 2 ∣ (n - 1).
+      -- If 2 ∣ (n - 1), then 2 ∣ m * (n - 1) for any m.
+      apply dvd_mul_of_dvd_right -- Use the tactic: if a ∣ c, then a ∣ b * c
+      -- We need to supply the proof that 2 ∣ (n - 1).
+      -- If n is Odd, we know `n = 2*k + 1` for some k.
+      rw [odd_iff_exists_bit1] at h_odd -- Converts Odd n to ∃ k, n = 2*k + 1
+      rcases h_odd with ⟨k, rfl⟩ -- Introduce k and substitute n = 2*k + 1
+      -- The goal is now to prove 2 ∣ (2*k + 1) - 1
+      simp only [Nat.add_sub_cancel] -- Simplifies (2*k + 1) - 1 to 2*k. Goal: 2 ∣ 2*k
+      -- Use the basic divisibility property a ∣ a * b
+      exact Nat.dvd_mul_right 2 k
+
+  -- Now that h_div (the proof of 2 ∣ n * (n - 1)) is established, use it.
+  rw [Nat.mul_div_cancel' h_div] -- Applies lemma k * (m / k) = m, given k ∣ m.
+                                 -- State: n * (n - 1) = n * (n - 1)
+  -- The goal is now trivial (reflexivity) and should be closed automatically by rw.
+
+
 lemma two_mul_choose_two_cancel (n : ℕ ) : 2*n.choose 2 = n*(n - 1) := by
   rw [Nat.choose_two_right]
   ring_nf
@@ -238,8 +273,8 @@ noncomputable instance IsAntisymmSym2 (n:ℕ):  IsAntisymm (Sym2 (Fin n)) lex :=
   aesop
   simp_all
   observe: a.sup = b.sup
-  rw [@Sym2.eq_iff_inf_sup_eq]
-  exact Prod.ext H this
+  rw [← @inf_eq_inf_and_sup_eq_sup]
+  exact And.symm ⟨this, H⟩
 
 noncomputable instance IsTotalSym2 (n:ℕ):  IsTotal (Sym2 (Fin n)) lex := by
   refine { total := ?_ }
@@ -259,6 +294,8 @@ noncomputable instance IsTotalSym2 (n:ℕ):  IsTotal (Sym2 (Fin n)) lex := by
   aesop (add unsafe Fin.le_antisymm)
   have: b.sup < a.sup := by aesop (add unsafe Fin.le_antisymm)
   exact Fin.le_of_lt this
+
+
 
 noncomputable def GreedySpanner (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
   Rec t G {} 0 #G.edgeFinset
@@ -283,7 +320,6 @@ noncomputable def GreedySpanner (G : FinSimpleGraph n) (t :ℕ)[NeZero t] :=
       rw [← Finset.mem_sort lex]
       exact List.head_mem G_sort_non_empty
     )
-
 
 noncomputable def FinSimpleGraph.IndexOfEdgeInG' (G : FinSimpleGraph n) (e : Edge n) (h: e ∈ G.edgeSet) : ℕ :=
   let o := (G.edgeFinset.toList.indexOf? e)
@@ -321,8 +357,6 @@ lemma  FinSimpleGraph.IndexOfEdgeZeroIsHead (G : FinSimpleGraph n) (Gnonempty: (
 
 noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]  :=
   GreedySpanner.Rec t G {} 0 i
-
-
 
 lemma greedySpanneri_vs_i_plus'(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
   let H_i  := GreedySpanner.Rec t G {} 0 i --GreedySpanner_itr G t i
@@ -409,7 +443,12 @@ lemma G_non_empty_of_drop_lt_num_edges (G : FinSimpleGraph n){i : ℕ }(h: i < G
       rw [@List.mem_toFinset]
       exact List.head_mem drop_nonempty_list
 
+lemma G_lex_list_non_empty_of_drop_lt_num_edges {G : FinSimpleGraph n}{i : ℕ }(h: i < (G.edgeFinset.sort lex).length):
+   ((G.edgeFinset.sort lex).drop i) ≠ [] := by simp_all only [length_toList, Set.toFinset_card, Fintype.card_ofFinset,
+     ne_eq, List.drop_eq_nil_iff, not_le]
 
+lemma G_lex_non_empty_of_drop_lt_num_edges (G : FinSimpleGraph n){i : ℕ }(h: i < (G.edgeFinset.sort lex).length):
+  fromEdgeSet ((G.edgeFinset.sort lex).drop i).toFinset.toSet ≠ (⊥ : SimpleGraph (Fin n)) := by sorry
 
 /- lemma G_ip_eq_G_i_minus_e (G :FinSimpleGraph n){i : ℕ} (h: i < G.edgeFinset.toList.length):
   let G_i : SimpleGraph (Fin n) := fromEdgeSet ↑(List.drop i (edgeFinset G).toList).toFinset;
@@ -423,50 +462,31 @@ lemma G_non_empty_of_drop_lt_num_edges (G : FinSimpleGraph n){i : ℕ }(h: i < G
   G_ip = G_i_minus_e  := sorry-/
 
      -- this : G'' = G'
-def Gi (G : FinSimpleGraph n)(i :ℕ ) : SimpleGraph (Fin n) := fromEdgeSet (List.drop i (edgeFinset G).toList).toFinset
-noncomputable def list_Gi (G : FinSimpleGraph n)(i :ℕ ) : List (Sym2 (Fin n)) := (edgeFinset G).toList.drop i
 
-lemma  aux (G : FinSimpleGraph n)(i : ℕ)(h1: list_Gi G i ≠ [])(h2:(Gi G i).edgeFinset.toList ≠ [] ):
-          (Gi G i).edgeFinset.toList.head h2 = (list_Gi G i).head h1:= by
+--lemma sort_drop_sort_eq_drop_sort (s : Finset α) (i:ℕ):
+--sort r ((s.sort r).drop i).toFinset = (s.sort r).drop i := sorry
 
---    dsimp [Gi]
-    --simp only [list_Gi, List.head_drop]
-    --have:= List.head_drop h1
-    --rw [← this]
+lemma fromEdgeSet_edgeFinset_cancel {V : Type u} {s : Finset (Sym2 V)}: (fromEdgeSet ↑s).edgeFinset = s := sorry
 
-    have h3: (List.drop i (edgeFinset G).toList).toFinset.toList ≠ [] := by simpa [list_Gi] using h1
-    suffices (Gi G i).edgeFinset.toList =  (list_Gi G i) by aesop
-    have simp1: (Gi G i).edgeFinset =  (List.drop i (edgeFinset G).toList).toFinset := by
-      have: (Gi G i).edgeFinset = (Gi G i).edgeSet := by exact coe_edgeFinset (Gi G i)
-      rw [← Finset.coe_inj,this]
-      simp [Gi]
+noncomputable def list_Gi (G : FinSimpleGraph n)(i :ℕ ) : List (Sym2 (Fin n)) := ((edgeFinset G).sort lex).drop i
+def Gi (G : FinSimpleGraph n)(i :ℕ ) : SimpleGraph (Fin n) := fromEdgeSet (list_Gi G i).toFinset
 
-      rw [@Set.disjoint_iff_inter_eq_empty]
+lemma  aux (G : FinSimpleGraph n)(i : ℕ)(h1: list_Gi G i ≠ [])(h2:(Gi G i).edgeFinset.sort lex ≠ [] ):
+          ((Gi G i).edgeFinset.sort lex).head h2 = (list_Gi G i).head h1:= by
 
-      -- duplicate lemma
-      have H': ∀ e ∈ (List.drop i (edgeFinset G).toList).toFinset, ¬e.IsDiag := by
-        intro e he
-        suffices e ∈ G.edgeFinset from  SimpleGraph.not_isDiag_of_mem_edgeFinset this
-        refine mem_toList.mp ?_
-        rw [@List.mem_toFinset] at he
-        exact List.mem_of_mem_drop he
+    have simp1: (Gi G i).edgeFinset =  (list_Gi G i).toFinset := by convert fromEdgeSet_edgeFinset_cancel
+    have simp2: ((Gi G i).edgeFinset.sort lex) =  ((list_Gi G i).toFinset.sort lex) := by exact congrArg (sort lex) simp1
+    have h3: ((list_Gi G i).toFinset.sort lex) ≠ [] := Ne.symm (ne_of_ne_of_eq (id (Ne.symm h2)) simp2)
+    have simp3: ((Gi G i).edgeFinset.sort lex).head h2 =  ((list_Gi G i).toFinset.sort lex).head h3 := by simp_all only [ne_eq]
+    rw [simp3]
+    suffices sort lex (list_Gi G i).toFinset = list_Gi G i by aesop
+    rw [list_Gi]
+    exact sort_drop_sort_eq_drop_sort lex (edgeFinset G) i
 
-      by_contra!
-      rw [@Set.inter_nonempty_iff_exists_right] at this
-      obtain ⟨x,⟨hx1,hx2⟩⟩  := this
-      suffices x∈ (List.drop i (edgeFinset G).toList).toFinset by exact H' x this hx1
-      exact List.mem_toFinset.mpr hx2
-    change (Gi G i).edgeFinset =  (list_Gi G i).toFinset at simp1
-
-    rw [simp1]
-
-    have:= (list_Gi G i).toFinset_toList ?_
-    sorry
-
-lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](itr :ℕ) (h: itr ≤ i) (hi1: i < G.edgeFinset.toList.length):
-    let G' := fromEdgeSet (G.edgeFinset.toList.drop itr).toFinset.toSet
+lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](itr :ℕ) (h: itr ≤ i) (hi1: i < (G.edgeFinset.sort lex).length):
+    let G' := fromEdgeSet ((G.edgeFinset.sort lex).drop itr).toFinset.toSet
     ∃ E' : Set (Edge n),
-    GreedySpanner.Rec t G {} 0 i     = GreedySpanner.Rec t G' E' itr i ∧  -- GreedySpanner_itr G t i
+    GreedySpanner.Rec t G {} 0 i     = GreedySpanner.Rec t G' E' itr i ∧  --
     GreedySpanner.Rec t G {} 0 (i+1) = GreedySpanner.Rec t G' E' itr (i+1) := by
 
    extract_lets G'
@@ -481,7 +501,7 @@ lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](i
      extract_lets G_ih at ih
      obtain ⟨E_ih,⟨ ih_itr_i, ih_itr_ip⟩⟩ := ih
 
-     have Gih_nonempty: ¬ (G_ih = (⊥ : SimpleGraph (Fin n))):= G_non_empty_of_drop_lt_num_edges G (Nat.lt_of_le_of_lt this hi1)
+     have Gih_nonempty: ¬ (G_ih = (⊥ : SimpleGraph (Fin n))):= G_lex_non_empty_of_drop_lt_num_edges G (Nat.lt_of_le_of_lt this hi1)
 
      observe iltitr: ¬ (i < itr)
 
@@ -492,28 +512,24 @@ lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](i
       omega
       exact Gih_nonempty
 
-
-     have Gnonempty : (@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).toList ≠ []  := GreedySpanner.Rec.proof_1 G_ih itr i (of_eq_false (eq_false non_base))
+     have Gnonempty : (@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).sort lex ≠ []  := GreedySpanner.Rec.proof_1 G_ih itr i (of_eq_false (eq_false non_base))
 --
-     let e := (@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).toList.head Gnonempty;
+     let e := ((@edgeFinset (Fin n) G_ih G_ih.fintypeEdgeSet).sort lex).head Gnonempty;
 --
      let u := (Quot.out e).1
      let v := (Quot.out e).2
      let G'' := G_ih.deleteEdges {e}
      have: G'' = G' := by
 
-     -- have: (List.drop itr (edgeFinset G).toList).diff [e] = (List.drop (itr+1) (edgeFinset G).toList) := sorry
-
       ext x y
-
-      let l1 := List.drop itr (edgeFinset G).toList
+      let l1 := ((edgeFinset G).sort lex).drop itr
       have l1_non_empty_list : l1 ≠ [] := by
-        have itr_lt_G_length: itr < (edgeFinset G).toList.length := by exact  Nat.lt_of_le_of_lt this hi1
-        exact G_list_non_empty_of_drop_lt_num_edges itr_lt_G_length
-      let l1p := List.drop (itr+1) (edgeFinset G).toList
+        have itr_lt_G_length: itr < ((edgeFinset G).sort lex).length := by exact  Nat.lt_of_le_of_lt this hi1
+        exact G_lex_list_non_empty_of_drop_lt_num_edges itr_lt_G_length --G_list_non_empty_of_drop_lt_num_edges itr_lt_G_length
+      let l1p := ((edgeFinset G).sort lex).drop (itr+1)
       have l1_nodup: l1.Nodup := by
-        have list_from_G_nodup := (edgeFinset G).nodup_toList
-        have l1_subseteq_list_from_G: l1.Sublist (edgeFinset G).toList := List.drop_sublist itr (edgeFinset G).toList--List.drop_subset itr (edgeFinset G).toList
+        have list_from_G_nodup := (edgeFinset G).sort_nodup lex
+        have l1_subseteq_list_from_G: l1.Sublist ((edgeFinset G).sort lex) := by exact List.drop_sublist itr (sort lex (edgeFinset G))--List.drop_sublist itr ((edgeFinset G).sort lex)--List.drop_subset itr (edgeFinset G).toList
         exact List.Sublist.nodup l1_subseteq_list_from_G list_from_G_nodup
 
       let le : List (Sym2 (Fin n)):= [e]
@@ -540,8 +556,7 @@ lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](i
         aesop
 
       constructor
-      ·
-        simp [G',G'']
+      · simp [G',G'']
         intro h1 h2
         have xyinl1: s(x,y) ∈  l1 := by aesop_graph
         have xyinl1_minus_e: s(x,y) ∈  l1.diff le := by
@@ -552,8 +567,7 @@ lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](i
         constructor
         · aesop
         · aesop_graph
-      ·
-        simp [G',G'']
+      · simp [G',G'']
         intro h1 h2
         have: s(x, y) ∈ l1 := by
           suffices l1p ⊆ l1 by aesop
@@ -593,14 +607,14 @@ lemma greedySpanneri_vs_i_plus_aux (G : FinSimpleGraph n)(t i:ℕ ) [NeZero t](i
       use E_ih
       exact ⟨by aesop, by aesop⟩
 
-lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
-  let H_i  := GreedySpanner.Rec t G {} 0 i -- GreedySpanner_itr G t i
-  let H_i2 := GreedySpanner.Rec t G {} 0 (i+1) --  GreedySpanner_itr G t (i+1)
-  let e := G.edgeFinset.toList.get ⟨i,hi1⟩
+lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < (G.edgeFinset.sort lex).length) [NeZero t]:
+  let H_i  := GreedySpanner.Rec t G {} 0 i     -- GreedySpanner_itr G t i
+  let H_i2 := GreedySpanner.Rec t G {} 0 (i+1) -- GreedySpanner_itr G t (i+1)
+  let e := (G.edgeFinset.sort lex).get ⟨i,hi1⟩
   let u := (Quot.out e).1
   let v := (Quot.out e).2
-  if (2*t -1) < H_i.edist u v then   H_i2.edgeSet =  H_i.edgeSet ∪ {e}
-  else  H_i = H_i2 :=  by
+  H_i2 = if (2 * t - 1) < H_i.edist u v then fromEdgeSet (H_i.edgeSet ∪ {e}) else H_i
+  :=  by
 
   extract_lets H_i H_i2 e u v
 
@@ -613,7 +627,7 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
     simp [GreedySpanner.Rec]
   rw [this] at h1
 
-  have G'_nonempty: ¬ (G' = (⊥ : SimpleGraph (Fin n))):= G_non_empty_of_drop_lt_num_edges G hi1
+  have G'_nonempty: ¬ (G' = (⊥ : SimpleGraph (Fin n))):= G_lex_non_empty_of_drop_lt_num_edges G hi1
   observe: ¬ (i+1 ≤ i)
   have non_base_p: ¬ (i+1 ≤ i ∨ G' = (⊥ : SimpleGraph (Fin n))) := by
     push_neg
@@ -626,13 +640,12 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
     unfold GreedySpanner.Rec
     simp [non_base_p,G'_nonempty]
 
-  have Gnonempty : (@edgeFinset (Fin n) G' G'.fintypeEdgeSet).toList ≠ []  := GreedySpanner.Rec.proof_1 G' i (i+1) (of_eq_false (eq_false non_base_p))
+  have Gnonempty : (@edgeFinset (Fin n) G' G'.fintypeEdgeSet).sort lex ≠ []  := GreedySpanner.Rec.proof_1 G' i (i+1) (of_eq_false (eq_false non_base_p))
 
-  let e' := (@edgeFinset (Fin n) G' G'.fintypeEdgeSet).toList.head Gnonempty
+  let e' := ((@edgeFinset (Fin n) G' G'.fintypeEdgeSet).sort lex).head Gnonempty
   let u' := (Quot.out e').1
   let v' := (Quot.out e').2
   let G'' := G'.deleteEdges {e'}
-
 
   obtain ⟨uu',vv', ee'⟩ : u = u' ∧ v = v' ∧ e = e' := by
     suffices ee': e = e' by aesop
@@ -647,7 +660,6 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
     dsimp [Gi]
     aesop
 
-
   by_cases h_distance: 2 * ↑t - 1 < (fromEdgeSet E').edist u' v'
 
   · -- if 2 * ↑t - 1 < (fromEdgeSet E').edist u' v'
@@ -660,16 +672,18 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFi
     simp only [h_distance, ↓reduceIte, H_i, H_i2]
     rw [h2]
 
-    change (fromEdgeSet ( {e'} ∪ E')).edgeSet =  {e'} ∪  (fromEdgeSet E').edgeSet
+--    change (fromEdgeSet ( {e'} ∪ E')).edgeSet =  {e'} ∪  (fromEdgeSet E').edgeSet
+    change (fromEdgeSet ( {e'} ∪ E')) = fromEdgeSet ({e'} ∪  (fromEdgeSet E').edgeSet)
 
     have: ¬e'.IsDiag := by
       suffices e' ∈ G'.edgeFinset from  SimpleGraph.not_isDiag_of_mem_edgeFinset this
-      have: e' ∈ G'.edgeFinset.toList:= by
+      have: e' ∈ G'.edgeFinset.sort lex:= by
         have:= List.head_mem Gnonempty
         convert this
-      exact mem_toList.mp this
+      exact (mem_sort lex).mp this
 
-    refine insert_an_edge_diff_ordering E' this
+    have:= insert_an_edge_diff_ordering E' this
+    aesop
 
   · -- else
     conv at h2 =>
@@ -719,10 +733,10 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
 
           simp only [nottarget, emptyGraph_eq_bot, Gnotbot, or_self, ↓reduceDIte, ge_iff_le]
 
-          have Gnonempty:  (edgeFinset G_aux).toList ≠ [] := GreedySpanner.Rec.proof_1 G_aux itr (target+1) H
+          have Gnonempty:  (edgeFinset G_aux).sort lex ≠ [] := GreedySpanner.Rec.proof_1 G_aux itr (target+1) H
           simp [Gnotbot]
 
-          let e := (edgeFinset G_aux).toList.head Gnonempty;
+          let e := ((edgeFinset G_aux).sort lex).head Gnonempty;
           let u := (Quot.out e).1;
           let v := (Quot.out e).2;
 
@@ -782,95 +796,54 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
     aesop
 
 
-lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(hG: G.Connected)(t :ℕ ) [NeZero t] {e : Edge n} (he: e ∈ G.edgeSet) :
-  let H_i := GreedySpanner_itr G t (G.IndexOfEdgeInG e)
+noncomputable def FinSimpleGraph.IndexOfEdgeInGLex (G : FinSimpleGraph n) (e : Sym2 (Fin n)) : ℕ := ((G.edgeFinset.sort lex).indexOf e)
+
+lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Sym2 (Fin n)} (he: e ∈ G.edgeSet) :
+  let i :=  G.IndexOfEdgeInGLex e
+  let H_e := GreedySpanner_itr G t (i+1)
   let u := (Quot.out e).1
   let v := (Quot.out e).2
-  H_i.edist u v ≤ 2*t-1 := by
+  H_e.edist u v ≤ 2*t-1 := by
 
-  sorry
+  extract_lets i H_e u v
+  have h_index_e: i < (sort lex (edgeFinset G)).length := by
+    dsimp [i,IndexOfEdgeInGLex]
+    rw [@List.indexOf_lt_length]
+    rw [@mem_sort]
+    exact Set.mem_toFinset.mpr he
 
---   --have obst: 0 < t := by exact Nat.pos_of_neZero t
---   observe obs_t: 0 < t
+  have H:= greedySpanneri_vs_i_plus G t i h_index_e
+  extract_lets H1 H2 e' u' v' at H
+  have: H_e = H2 := rfl
+  have ee': e = e' := by   simp [e',i,IndexOfEdgeInGLex]
+  obtain ⟨uu',vv'⟩ : u = u' ∧ v = v' := by exact Prod.ext_iff.mp (congrArg Quot.out ee')
+  rw [this,uu',vv']
+  by_cases dist: 2 * ↑t - 1 < SimpleGraph.edist H1 u' v'
+  · simp [dist] at H
+    have: H2.edist u' v' = 1 := by
+      rw [edist_eq_one_iff_adj]
+      rw [← @mem_edgeSet]
+      have: e' = s(u',v') := by simp [u',v']
+      rw [← this]
+      simp [H]
+      refine G.not_isDiag_of_mem_edgeSet ?_
+      exact Set.mem_of_eq_of_mem (id (Eq.symm ee')) he
+    rw [this]
+    observe: 1 ≤ t
+    observe o: 1 ≤ (t : ℕ∞)
+    have: 1 ≤ 2 *t -1 := by omega
+    have: 2 ≤ 2 *(t : ℕ∞)  := by exact le_mul_of_one_le_right' o
+    have: 2 -1 ≤ 2 *(t : ℕ∞) -1 := by exact tsub_le_tsub_right this 1
+    have h1: 2 -1 = (1 :ℕ∞) := by rfl
+    rw [h1] at this
+    exact this
+  · simp [dist] at H
+    rw [H]
+    exact le_of_not_lt dist
 
---   extract_lets H_i u v
---   by_cases h_idx: ((G.IndexOfEdgeInG e) = 0)
---   · -- h_inx = 0
---     unfold H_i GreedySpanner_itr GreedySpannerRec
---     by_cases h2: G = emptyGraph (Fin n)
---     · -- case 2.1
---       have: ¬ (⊥ : SimpleGraph (Fin n)).Connected := by aesop
---       aesop
-
---     · -- case 2.2
---       have Gnotbot: G ≠ (⊥ : SimpleGraph (Fin n)) := by aesop
---       simp [h2,Gnotbot]
-
---       have Gnonempty:  (edgeFinset G).toList ≠ [] := GreedySpannerRec.proof_1 G (Eq.mpr_not (Eq.refl (G = (emptyGraph (Fin n)))) (of_eq_false (eq_false Gnotbot)))
---       simp [Gnotbot]
-
---       let e' : Edge n := (edgeFinset G).toList.head Gnonempty;
---       let u' := (Quot.out e').1
---       let v' := (Quot.out e').2
-
---       have eeqe: e = e' := by exact IndexOfEdgeZeroIsHead G Gnonempty e he h_idx
---       have uu' : u = u' := by aesop
---       have vv' : v = v' := by aesop
---       have h_idx': G.IndexOfEdgeInG ((edgeFinset G).toList.head Gnonempty) = 0 := by aesop
---       have h3: 2*t -1 < (fromEdgeSet {}).edist u' v' := by
---         have: (fromEdgeSet {}).edist u' v' = ⊤ := by
---           refine edist_eq_top_of_not_reachable ?_
---           simp only [fromEdgeSet_empty, reachable_bot]
---           rw [← uu',←  vv']
---           have : e = s(u,v) := by aesop
---           have: G.Adj u v := by
---             refine (mem_edgeSet G).mp ?_
---             aesop
---           aesop
---         rw [this]
---         exact Batteries.compareOfLessAndEq_eq_lt.mp rfl
---       simp only [h3, ↓reduceIte, eeqe, ge_iff_le, e', v', u']
---       unfold GreedySpannerRec
---       simp only [h_idx', zero_add, le_refl, ↓reduceIte, e', v', u']
---       show (fromEdgeSet {e'}).edist u v ≤ 2 * ↑t - 1
---       rw [← eeqe]
---       have: (fromEdgeSet {e}).edist u v = 1 := by
---         refine edist_eq_one_iff_adj.mpr ?_
---         aesop
---       rw [this]
---       refine ENat.le_sub_of_add_le_left ?_ ?_
---       aesop
---       ring_nf
---       refine le_mul_of_one_le_left' ?_
---       exact Nat.one_le_cast.mpr obs_t
-
---   · -- h_indx > 0
---     let H_i_minus := GreedySpanner_itr G t ((G.IndexOfEdgeInG e)-1)
---     have hgindex: G.IndexOfEdgeInG e - 1 + 1 =  G.IndexOfEdgeInG e := by  rw [Nat.sub_one_add_one h_idx]
---     by_cases h_i_minus_dist: H_i_minus.edist u v ≤ 2*t - 1
---     · -- small dist
---       have H_i_minus_subgraph_H_i: H_i_minus.IsSubgraph H_i := by
---         have:= greedySpannerItrSubgraph G t ((G.IndexOfEdgeInG e)-1)
---         simp only at this
---         conv at this =>
---           enter [2,3]
---           simp [hgindex]
---         aesop
-
---       have ureachv: H_i_minus.Reachable u v := by
---         refine edist_ne_top_iff_reachable.mp ?_
---         have: (2 * ↑t - 1 : ENat ) < ⊤ := by exact Batteries.compareOfLessAndEq_eq_lt.mp rfl
---         aesop
--- --        rw [SimpleGraph.connected_iff_exists_forall_reachable] at hG
--- --        obtain ⟨r,hr⟩ := hG
--- --        have ru: G.Reachable r u := by exact hr u
--- --       have rv: G.Reachable r v := by exact hr v
--- --        exact Reachable.trans (id (Reachable.symm ru)) (hr v)
---       calc
---         SimpleGraph.edist H_i u v ≤  SimpleGraph.edist H_i_minus u v  := SimpleGraph.edist_anti H_i_minus_subgraph_H_i
---         _ ≤ 2 * ↑t - 1  := h_i_minus_dist
---     · -- large dist
---       sorry
+lemma greedySpannerDistUB (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] (u v: Fin n) :
+  let H := GreedySpanner G t
+  H.edist u v ≤ (2*t-1)*G.edist u v := sorry
 
 lemma greedySpannerSubgraphOf(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
   let H := GreedySpanner G t
