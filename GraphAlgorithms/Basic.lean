@@ -358,17 +358,6 @@ lemma  FinSimpleGraph.IndexOfEdgeZeroIsHead (G : FinSimpleGraph n) (Gnonempty: (
 noncomputable def GreedySpanner_itr   (G : FinSimpleGraph n) (t i:ℕ)[NeZero t]  :=
   GreedySpanner.Rec t G {} 0 i
 
-lemma greedySpanneri_vs_i_plus'(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < G.edgeFinset.toList.length) [NeZero t]:
-  let H_i  := GreedySpanner.Rec t G {} 0 i --GreedySpanner_itr G t i
-  let H := GreedySpanner G t
-  let e := G.edgeFinset.toList.get ⟨i,hi1⟩
-  let u := (Quot.out e).1
-  let v := (Quot.out e).2
-  if (2*t -1) < H_i.edist u v then   e ∈ H.edgeSet
-  else  e ∉ H.edgeSet :=  by
-  sorry
-
-
 lemma  insert_an_edge_diff_ordering (E : Set (Edge n)) {e : Edge n} (h1: ¬e.IsDiag)
 : (fromEdgeSet ({e} ∪ E)).edgeSet = {e} ∪ (fromEdgeSet E).edgeSet := by
   refine Set.ext ?_
@@ -672,7 +661,6 @@ lemma greedySpanneri_vs_i_plus(G : FinSimpleGraph n)(t i:ℕ )(hi1: i < (G.edgeF
     simp only [h_distance, ↓reduceIte, H_i, H_i2]
     rw [h2]
 
---    change (fromEdgeSet ( {e'} ∪ E')).edgeSet =  {e'} ∪  (fromEdgeSet E').edgeSet
     change (fromEdgeSet ( {e'} ∪ E')) = fromEdgeSet ({e'} ∪  (fromEdgeSet E').edgeSet)
 
     have: ¬e'.IsDiag := by
@@ -795,10 +783,9 @@ lemma greedySpannerItrSubgraph(G : FinSimpleGraph n)(t i:ℕ ) [NeZero t]:
         change (GreedySpanner.Rec t (deleteEdges G_aux {e}) (E_H) (itr+1) (target+1))
     aesop
 
-
 noncomputable def FinSimpleGraph.IndexOfEdgeInGLex (G : FinSimpleGraph n) (e : Sym2 (Fin n)) : ℕ := ((G.edgeFinset.sort lex).indexOf e)
 
-lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Sym2 (Fin n)} (he: e ∈ G.edgeSet) :
+lemma greedySpannerDistUBAtEdgeItr (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Sym2 (Fin n)} (he: e ∈ G.edgeSet) :
   let i :=  G.IndexOfEdgeInGLex e
   let H_e := GreedySpanner_itr G t (i+1)
   let u := (Quot.out e).1
@@ -841,23 +828,49 @@ lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : 
     rw [H]
     exact le_of_not_lt dist
 
+lemma greedySpannerDistUBAtEdge (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] {e : Sym2 (Fin n)} (he: e ∈ G.edgeSet) :
+  let i := G.IndexOfEdgeInGLex e
+  let H := GreedySpanner G t
+  let u := (Quot.out e).1
+  let v := (Quot.out e).2
+  H.edist u v ≤ 2*t-1 := by sorry
+
+#check SimpleGraph.Walk
+
+
+--variable {V : Type u} {V' : Type v} {V'' : Type w}
+--variable (G : SimpleGraph V) (G' : SimpleGraph V') (G'' : SimpleGraph V'')
+
+--def append {u v w : V} : G.Walk u v → G.Walk v w → G.Walk u w
+--  | nil, q => q
+--  | cons h p, q => cons h (p.append q)
+
+
 lemma greedySpannerDistUB (G : FinSimpleGraph n)(t :ℕ ) [NeZero t] (u v: Fin n) :
   let H := GreedySpanner G t
-  H.edist u v ≤ (2*t-1)*G.edist u v := sorry
+  H.edist u v ≤ (2*t-1)*G.edist u v := by
+  extract_lets H
+  by_cases hr: G.Reachable u v
+  obtain ⟨p,hp⟩ : ∃ (p : G.Walk u v), p.length = G.dist u v := Reachable.exists_walk_length_eq_dist hr
+  have: ∃ (q : H.Walk u v), q.length ≤ (2*t-1)* (G.dist u v) := by sorry
+  sorry
+  sorry
+
+
+
+
 
 lemma greedySpannerSubgraphOf(G : FinSimpleGraph n)(t :ℕ ) [NeZero t]:
   let H := GreedySpanner G t
   H.IsSubgraph G := by sorry
 
- def greedySpannerImperative  (G : FinSimpleGraph n) (t :ℕ )[NeZero t] : FinSimpleGraph n := Id.run do
-  let mut f_H : BinarySqMatrix n := fun (_ _) ↦ false
-  for e in G.edgeFinset.toList do
-    if (2*t -1) < f_H.dist e then f_H := f_H.AddEdge e
-  SimpleGraph.fromRel f_H
 
 lemma correctnessOfGreedySpanner (G : FinSimpleGraph n) (t : ℕ) [NeZero t]:
   let H := GreedySpanner G t
-  H.IsSpannerOf G (2*t-1) := by sorry
+  H.IsSpannerOf G (2*t-1) := by
+  simp [IsSpannerOf]
+  sorry
+
 
 lemma girthOfGreedySpanner {n:ℕ }(G : FinSimpleGraph n)(t :ℕ ) [NeZero t] :
   let H := GreedySpanner G t
@@ -872,3 +885,11 @@ noncomputable def minSpannerSize  {n:ℕ } (G : FinSimpleGraph n) (t:ℕ): Fin (
 
 theorem minSpannerSizeLe  {n:ℕ } (G : FinSimpleGraph n) (t:ℕ) :
   minSpannerSize G (2*t-1) ≤ 100 * t * n * (NNReal.rpow ↑n (1/(↑t))) := by sorry
+
+
+
+def greedySpannerImperative  (G : FinSimpleGraph n) (t :ℕ )[NeZero t] : FinSimpleGraph n := Id.run do
+  let mut f_H : BinarySqMatrix n := fun (_ _) ↦ false
+  for e in G.edgeFinset.toList do
+    if (2*t -1) < f_H.dist e then f_H := f_H.AddEdge e
+  SimpleGraph.fromRel f_H
