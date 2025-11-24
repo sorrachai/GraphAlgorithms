@@ -6,6 +6,14 @@ on:
   workflow_dispatch:    # Allows the workflow to be triggered manually via the GitHub interface
 
 jobs:
+
+  build:
+    if: false  # This prevents the workflow from running
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Workflow disabled"
+        
   check-for-updates: # Determines which updates to apply.
     runs-on: ubuntu-latest
     outputs:

@@ -1,14 +1,21 @@
 name: Create Release
 
 on:
-  push:
-    branches:
-      - 'main'
-      - 'master'
-    paths:
-      - 'lean-toolchain'
+  workflow_dispatch: 
+  #push:
+  #  branches:
+  #    - 'main'
+  #    - 'master'
+  #  paths:
+  #    - 'lean-toolchain'
 
 jobs:
+  build:
+    if: false  # This prevents the workflow from running
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Workflow disabled"
   lean-release-tag:
     name: Add Lean release tag
     runs-on: ubuntu-latest
