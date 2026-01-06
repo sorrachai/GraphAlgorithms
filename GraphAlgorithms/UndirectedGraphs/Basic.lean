@@ -300,6 +300,23 @@ def weight (G : UndirectedGraph α β) (U : Finset α) (w : Edge α β → R) : 
 
 -- def size (G : UndirectedGraph α β) (U : Finset α) : ℕ := (Cut G U).card
 
+
+lemma cut_submodular_grind (G : UndirectedGraph α β) (U W : Finset α) (w : Edge α β → R) :
+  weight G (U ∩ W) w + weight G (U ∪ W) w ≤ weight G U w + weight G W w := by
+  have h1 : Cut G (U ∩ W) ⊆ Cut G U ∪ Cut G W := by grind [Cut]
+  have h2 : Cut G (U ∪ W) ⊆ Cut G U ∪ Cut G W := by grind [Cut]
+  have h3 : Cut G (U ∩ W) ∩ Cut G (U ∪ W) ⊆ Cut G U ∩ Cut G W := by grind [Cut]
+  have h : (G.Cut (U ∩ W)) ∪ (G.Cut (U ∪ W)) ⊆ (G.Cut U) ∪ (G.Cut W) := by apply union_subset h1 h2
+  clear h1 h2
+  repeat unfold weight
+  rw[<-Finset.sum_union_inter]
+  nth_rw 2 [<-Finset.sum_union_inter]
+  have h3 : Finset.sum (G.Cut (U ∩ W) ∩ G.Cut (U ∪ W)) w ≤ Finset.sum (G.Cut U ∩ G.Cut W) w := by
+    apply Finset.sum_le_sum_of_subset h3
+  have h : Finset.sum (G.Cut (U ∩ W) ∪ G.Cut (U ∪ W)) w ≤ Finset.sum (G.Cut U ∪ G.Cut W) w := by
+    apply Finset.sum_le_sum_of_subset h
+  apply add_le_add h h3
+
 lemma cut_submodular (G : UndirectedGraph α β) (U W : Finset α) (w : Edge α β → R) :
   weight G (U ∩ W) w + weight G (U ∪ W) w ≤ weight G U w + weight G W w := by
   have h1 : Cut G (U ∩ W) ⊆ Cut G U ∪ Cut G W := by
