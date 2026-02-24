@@ -37,10 +37,6 @@ abbrev NoParallelUndirectedGraph (α : Type*) := UndirectedGraph α Unit
 def SimpleGraph (α : Type*) :=
   { G : NoParallelUndirectedGraph α // ∀ e ∈ G.edgeSet, ¬ e.endpoints.IsDiag }
 
-
-
-
-
 namespace UndirectedGraph
 
 open Finset

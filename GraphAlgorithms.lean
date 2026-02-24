@@ -1,1 +1,1 @@
-import GraphAlgorithms.Basic
+import GraphAlgorithms.DataStructures.SplayTrees.BinaryTree
