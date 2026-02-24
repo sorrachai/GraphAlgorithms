@@ -144,7 +144,18 @@ private lemma two_seqs_append_of {V : Type*} (w1 w2 : Walk V) (hneq : w1.tail �
   cases w1
   cases w2
   simp_all [Walk.tail,Walk.head]
-  sorry
+  fun_induction seq.append seq_1
+  · exact IsWalk.cons w v valid hneq
+  · have: IsWalk w2 := by
+        cases valid_1
+        assumption
+    have: w2.tail ≠ v := by
+        cases valid_1
+        assumption
+    simp [VertexSeq.head] at hneq
+    simp_all [forall_const]
+    refine IsWalk.cons (w.append w2) v ih1 ?_
+    simpa only [tail_on_tail, ne_eq]
 
 lemma drop_tail_eq_tail_len_zero (w : Walk α) (h : w.dropTail.tail = w.tail):
   w.length = 0 := by
