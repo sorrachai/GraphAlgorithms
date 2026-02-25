@@ -31,7 +31,6 @@ abbrev IncidentEdgeSet (G : SimpleGraph α) (s : α) :
   Finset (Edge α) := {e ∈ E(G) | s ∈ e}
 
 /-- `δ(G,v)` denotes the `edge-incident-set` of a vertex `v` in `G`. -/
-
 scoped notation "δ(" G "," v ")" => SimpleGraph.IncidentEdgeSet G v
 
 abbrev Neighbors (G : SimpleGraph α) (s : α) :
@@ -67,15 +66,14 @@ def VertexSeq.tail {V : Type*} : VertexSeq V → V
   | singleton v => v
   | cons _ v   => v
 
-@[simp] lemma VertexSeq.con_tail_eq {V: Type*} (w : VertexSeq V) (u : V) :
+@[simp] lemma VertexSeq.con_tail_eq {V : Type*} (w : VertexSeq V) (u : V) :
   (w.cons u).tail = u := rfl
-
 
 def VertexSeq.head {V : Type*} : VertexSeq V → V
   | singleton v => v
   | cons w _   => VertexSeq.head w
 
-@[simp] lemma VertexSeq.con_heqad_eq {V: Type*} (w : VertexSeq V) (u : V) :
+@[simp] lemma VertexSeq.con_heqad_eq {V : Type*} (w : VertexSeq V) (u : V) :
   (w.cons u).head = w.head := rfl
 
 
@@ -92,22 +90,23 @@ def VertexSeq.append {V : Type*} : VertexSeq V →  VertexSeq V → VertexSeq V
   | w, .singleton v => .cons w v
   | w, .cons w2 v   => .cons (append w w2) v
 
-@[simp] lemma tail_on_tail {V : Type*} (p q : VertexSeq V): (p.append q).tail = q.tail := by
+@[simp] lemma tail_on_tail {V : Type*} (p q : VertexSeq V) : (p.append q).tail = q.tail := by
   fun_induction VertexSeq.append <;> simp_all [VertexSeq.tail]
 
-@[simp] lemma head_on_head {V : Type*} (p q : VertexSeq V): (p.append q).head = p.head := by
+@[simp] lemma head_on_head {V : Type*} (p q : VertexSeq V) : (p.append q).head = p.head := by
   fun_induction VertexSeq.append <;> simp_all
 
-@[simp] lemma tail_on_tail_singleton {V : Type*} (p : VertexSeq V) (x : V): (p.append (.singleton x)).tail = x := by
+@[simp] lemma tail_on_tail_singleton {V : Type*} (p : VertexSeq V) (x : V) :
+  (p.append (.singleton x)).tail = x := by
   unfold VertexSeq.append
   unfold VertexSeq.tail
   split <;> aesop
 
-@[simp] lemma head_on_head_singleton {V : Type*} (p : VertexSeq V) (x : V): ((VertexSeq.singleton x).append p).head = x := by
+@[simp] lemma head_on_head_singleton {V : Type*} (p : VertexSeq V) (x : V) :
+  ((VertexSeq.singleton x).append p).head = x := by
   unfold VertexSeq.append
   unfold VertexSeq.head
   split <;> aesop
-
 
 inductive IsWalk {V : Type*} : VertexSeq V → Prop
   | singleton (v : V) : IsWalk (VertexSeq.singleton v)
@@ -119,6 +118,12 @@ inductive IsWalk {V : Type*} : VertexSeq V → Prop
 structure Walk (V : Type*) where
   seq : VertexSeq V
   valid : IsWalk seq
+
+@[simp] theorem iswalk_prefix {V : Type*} (w2 : VertexSeq V) (v : V)
+(valid : IsWalk (w2.cons v)) : IsWalk w2 := by cases valid; grind
+
+@[simp] theorem tail_neq_of_iswalk {V : Type*} (w2 : VertexSeq V) (v : V)
+(valid : IsWalk (w2.cons v)) : w2.tail ≠ v := by cases valid; grind
 
 open VertexSeq
 /-- The list of vertices visited by the walk, in order. -/
@@ -139,25 +144,20 @@ abbrev Walk.dropTail (w : Walk α) : Walk α :=
     }
   }
 
-private lemma two_seqs_append_of {V : Type*} (w1 w2 : Walk V) (hneq : w1.tail ≠ w2.head):
+lemma two_seqs_append_of {V : Type*} (w1 w2 : Walk V) (hneq : w1.tail ≠ w2.head) :
   IsWalk (w1.seq.append w2.seq) := by
-  cases w1
-  cases w2
-  simp_all [Walk.tail,Walk.head]
+  cases w1; cases w2
+  simp_all only [Walk.tail, Walk.head, ne_eq]
   fun_induction seq.append seq_1
   · exact IsWalk.cons w v valid hneq
-  · have: IsWalk w2 := by
-        cases valid_1
-        assumption
-    have: w2.tail ≠ v := by
-        cases valid_1
-        assumption
-    simp [VertexSeq.head] at hneq
-    simp_all [forall_const]
-    refine IsWalk.cons (w.append w2) v ih1 ?_
-    simpa only [tail_on_tail, ne_eq]
+  · refine IsWalk.cons (w.append w2) v ?_ ?_
+    apply ih1 <;> simp_all only [forall_const, con_heqad_eq, not_false_eq_true]
+    · exact iswalk_prefix w2 v valid_1
+    · simp_all only [forall_const, con_heqad_eq, tail_on_tail, ne_eq, tail_neq_of_iswalk,
+      not_false_eq_true]
 
-lemma drop_tail_eq_tail_len_zero (w : Walk α) (h : w.dropTail.tail = w.tail):
+omit [DecidableEq α]
+lemma len_zero_of_drop_tail_eq_tail (w : Walk α) (h : w.dropTail.tail = w.tail) :
   w.length = 0 := by
   cases w
   induction valid
@@ -173,7 +173,7 @@ def append (w1 w2 : Walk α) (h : w1.tail = w2.head) : Walk α :=
       rw [← h]
       by_contra!
       absurd h1
-      apply drop_tail_eq_tail_len_zero
+      apply len_zero_of_drop_tail_eq_tail
       exact this
     } }
 
