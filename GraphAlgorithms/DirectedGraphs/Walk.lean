@@ -1,5 +1,5 @@
 import GraphAlgorithms.Core.Walk
-import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
+import GraphAlgorithms.DirectedGraphs.SimpleDiGraphs
 
 -- Authors: Sorrachai Yingchareonthawornchai
 
@@ -7,13 +7,16 @@ namespace Walk
 
 set_option tactic.hygienic false
 
-inductive IsWalkIn {V : Type*} (G : SimpleGraph V) : Walk V → Prop
+/-- A walk `w` is a walk in graph `G` if every consecutive pair of vertices
+    forms an edge in `G`, and the starting vertex lies in the vertex set. -/
+inductive IsWalkIn {V : Type*} (G : SimpleDiGraph V) : Walk V → Prop
   | singleton (v : V) (hv : v ∈ G.vertexSet)
     : IsWalkIn G ⟨.singleton v, .singleton v⟩
   | cons (w : Walk V) (u : V)
       (hw   : IsWalkIn G w)
       (hneq : w.seq.tail ≠ u)
-      (hedg : s(w.seq.tail, u) ∈ G.edgeSet)
+      (hedg : (w.seq.tail, u) ∈ G.edgeSet)
     : IsWalkIn G ⟨w.seq.cons u, .cons w.seq u w.valid hneq⟩
+
 
 end Walk

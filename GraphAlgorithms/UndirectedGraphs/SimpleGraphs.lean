@@ -1,7 +1,4 @@
-import Mathlib.Tactic
-import Mathlib.Order.WithBot
 import Mathlib.Data.Sym.Sym2
-import Mathlib.Data.Finset.Basic
 
 -- Undirected Graphs
 -- Authors: Sorrachai Yingchareonthawornchai
