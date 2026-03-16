@@ -2,7 +2,6 @@ import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
 
 open SimpleGraphs
 -- Authors: Sorrachai Yingchareonthawornchai
-namespace Walk
 
 set_option tactic.hygienic false
 variable {α : Type*} [DecidableEq α]
@@ -79,6 +78,8 @@ structure Walk (V : Type*) where
   seq : VertexSeq V
   valid : IsWalk seq
 
+namespace Walk
+
 @[simp] theorem iswalk_prefix {V : Type*} (w2 : VertexSeq V) (v : V)
 (valid : IsWalk (w2.cons v)) : IsWalk w2 := by cases valid; grind
 
@@ -87,13 +88,13 @@ structure Walk (V : Type*) where
 
 open VertexSeq
 /-- The list of vertices visited by the walk, in order. -/
-def Walk.support (w : Walk α) : List α := w.seq.toList
+def support (w : Walk α) : List α := w.seq.toList
 
-abbrev Walk.head (w : Walk α) : α := w.seq.head
-abbrev Walk.tail (w : Walk α) : α := w.seq.tail
-abbrev Walk.length (w : Walk α) : ℕ := w.seq.length
+abbrev head (w : Walk α) : α := w.seq.head
+abbrev tail (w : Walk α) : α := w.seq.tail
+abbrev length (w : Walk α) : ℕ := w.seq.length
 
-abbrev Walk.dropTail (w : Walk α) : Walk α :=
+abbrev dropTail (w : Walk α) : Walk α :=
   { seq := w.seq.dropTail, valid := by {
     have: IsWalk w.seq := by exact w.valid
     generalize h_eq1: w.seq  = p
