@@ -10,7 +10,6 @@ inductive BinaryTree where
 | node (left : BinaryTree) (key : ℕ) (right : BinaryTree)
 deriving Repr, BEq
 
-
 def BinaryTree.left : BinaryTree → BinaryTree
   | .empty => .empty
   | .node l _ _ => l
@@ -26,6 +25,15 @@ def BinaryTree.num_nodes : BinaryTree → ℕ
 | .empty => 0
 | .node left _ right => 1 + (num_nodes left) + (num_nodes right)
 
+/-
+Remark:
+This implementation is not really a "contain function",
+because a binary tree could have q >/< key and be in
+the left/right subtree of key respectively. Obviously,
+if BinaryTree.contains t q is true, then q is in t; but
+the converse need not necessarily hold true. The
+converse is true for a binary search tree.
+-/
 def BinaryTree.contains (t : BinaryTree) (q : Nat) : Prop :=
   match t with
   | .empty => False
