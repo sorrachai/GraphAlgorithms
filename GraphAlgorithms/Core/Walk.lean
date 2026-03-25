@@ -10,61 +10,65 @@ inductive VertexSeq (V : Type*)
   | singleton (v : V) : VertexSeq V
   | cons (w : VertexSeq V) (v : V) : VertexSeq V
 
+namespace VertexSeq
+
 /-- The list of vertices visited by the walk, in order. -/
-def VertexSeq.toList : VertexSeq α →  List α
+def toList : VertexSeq α →  List α
   | .singleton v => [v]
   | .cons p v => p.toList ++ [v]
 
 /-- The first node does not count in the sequence. -/
-@[simp] def VertexSeq.length {V : Type*} : VertexSeq V → ℕ
+@[simp] def length {V : Type*} : VertexSeq V → ℕ
   | singleton _ => 0
   | cons w _   => 1 + w.length
 
-def VertexSeq.tail {V : Type*} : VertexSeq V → V
+def tail {V : Type*} : VertexSeq V → V
   | singleton v => v
   | cons _ v   => v
 
-@[simp] lemma VertexSeq.con_tail_eq {V : Type*} (w : VertexSeq V) (u : V) :
+@[simp] lemma con_tail_eq {V : Type*} (w : VertexSeq V) (u : V) :
   (w.cons u).tail = u := rfl
 
-def VertexSeq.head {V : Type*} : VertexSeq V → V
+def head {V : Type*} : VertexSeq V → V
   | singleton v => v
   | cons w _   => VertexSeq.head w
 
-@[simp] lemma VertexSeq.con_heqad_eq {V : Type*} (w : VertexSeq V) (u : V) :
+@[simp] lemma con_heqad_eq {V : Type*} (w : VertexSeq V) (u : V) :
   (w.cons u).head = w.head := rfl
 
 
-def VertexSeq.dropTail {V : Type*} : VertexSeq V → VertexSeq V
+def dropTail {V : Type*} : VertexSeq V → VertexSeq V
   | singleton v => .singleton v -- singleton remains singleton
   | cons w _   => w
 
-def VertexSeq.dropHead {V : Type*} : VertexSeq V → VertexSeq V
+def dropHead {V : Type*} : VertexSeq V → VertexSeq V
   | singleton v => .singleton v -- singleton remains singleton
   | cons (singleton _) v => .singleton v
-  | cons w v   => VertexSeq.cons (VertexSeq.dropHead w) v
+  | cons w v   => cons (dropHead w) v
 
-def VertexSeq.append {V : Type*} : VertexSeq V →  VertexSeq V → VertexSeq V
+def append {V : Type*} : VertexSeq V →  VertexSeq V → VertexSeq V
   | w, .singleton v => .cons w v
   | w, .cons w2 v   => .cons (append w w2) v
 
 @[simp] lemma tail_on_tail {V : Type*} (p q : VertexSeq V) : (p.append q).tail = q.tail := by
-  fun_induction VertexSeq.append <;> simp_all [VertexSeq.tail]
+  fun_induction append <;> simp_all [VertexSeq.tail]
 
 @[simp] lemma head_on_head {V : Type*} (p q : VertexSeq V) : (p.append q).head = p.head := by
-  fun_induction VertexSeq.append <;> simp_all
+  fun_induction append <;> simp_all
 
 @[simp] lemma tail_on_tail_singleton {V : Type*} (p : VertexSeq V) (x : V) :
   (p.append (.singleton x)).tail = x := by
-  unfold VertexSeq.append
-  unfold VertexSeq.tail
-  split <;> aesop
+  unfold append
+  unfold tail
+  split <;> grind
 
 @[simp] lemma head_on_head_singleton {V : Type*} (p : VertexSeq V) (x : V) :
   ((VertexSeq.singleton x).append p).head = x := by
-  unfold VertexSeq.append
-  unfold VertexSeq.head
+  unfold append
+  unfold head
   split <;> aesop
+
+end VertexSeq
 
 inductive IsWalk {V : Type*} : VertexSeq V → Prop
   | singleton (v : V) : IsWalk (VertexSeq.singleton v)
@@ -136,5 +140,8 @@ def append (w1 w2 : Walk α) (h : w1.tail = w2.head) : Walk α :=
       apply len_zero_of_drop_tail_eq_tail
       exact this
     } }
+
+def append_single (w : Walk α) (u : α) (h : u ≠ w.tail) : Walk α :=
+  ⟨w.seq.cons u, .cons w.seq u w.valid (by aesop)⟩
 
 end Walk
