@@ -16,25 +16,26 @@ structure SimpleGraph (α : Type*) where
 
 open Finset
 
-namespace SimpleGraphs
+
+namespace SimpleGraph
 
 /-- `V(G)` denotes the `vertexSet` of a graph `G`. -/
-scoped notation "V(" G ")" => SimpleGraph.vertexSet G
+scoped notation "V(" G ")" => vertexSet G
 
 /-- `E(G)` denotes the `edgeSet` of a graph `G`. -/
-scoped notation "E(" G ")" => SimpleGraph.edgeSet G
+scoped notation "E(" G ")" => edgeSet G
 
 abbrev IncidentEdgeSet (G : SimpleGraph α) (s : α) :
   Finset (Edge α) := {e ∈ E(G) | s ∈ e}
 
 /-- `δ(G,v)` denotes the `edge-incident-set` of a vertex `v` in `G`. -/
-scoped notation "δ(" G "," v ")" => SimpleGraph.IncidentEdgeSet G v
+scoped notation "δ(" G "," v ")" => IncidentEdgeSet G v
 
 abbrev Neighbors (G : SimpleGraph α) (s : α) :
   Finset α := {u ∈ V(G) | ∃ e ∈ E(G), s ∈ e ∧ u ∈ e ∧ u ≠ s}
 
 /-- `N(G,v)` denotes the `neighbors` of a graph `G`. -/
-scoped notation "N(" G "," v ")" => SimpleGraph.Neighbors G v
+scoped notation "N(" G "," v ")" => Neighbors G v
 
 /-- `deg(G)` denotes the `degree` of a graph `G`. -/
 scoped notation "deg(" G "," v ")" => #δ(G,v)
@@ -44,4 +45,4 @@ abbrev subgraphOf (H G : SimpleGraph α) : Prop :=
 
 scoped infix:50 " ⊆ᴳ " => SimpleGraph.subgraphOf
 
-end SimpleGraphs
+end SimpleGraph
