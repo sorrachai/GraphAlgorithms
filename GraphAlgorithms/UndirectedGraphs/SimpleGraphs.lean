@@ -43,6 +43,6 @@ scoped notation "deg(" G "," v ")" => #δ(G,v)
 abbrev subgraphOf (H G : SimpleGraph α) : Prop :=
   V(H) ⊆ V(G) ∧ E(H) ⊆ E(G)
 
-scoped infix:50 " ⊆ᴳ " => SimpleGraph.subgraphOf
+scoped infix:50 " ⊆ᴳ " => subgraphOf
 
 end SimpleGraph
