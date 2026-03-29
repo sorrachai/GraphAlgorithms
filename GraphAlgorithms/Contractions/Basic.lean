@@ -19,19 +19,32 @@ variable {α β : Type*} [DecidableEq α] [DecidableEq β]
 private def redirectEdge (u v : α) (e : Edge α β) : Edge α β :=
   { id := e.id, endpoints := e.endpoints.map (fun x => if x = v then u else x) }
 
+/-
+  **TODO**: sadly this is necessary for now.
+-/
+attribute [local instance] Classical.propDecidable in
 /-- **Contract** `v` into `u`: remove `v` from the vertex set, redirect every edge that
-    touched `v` to `u` instead, and discard the resulting loops. -/
+    touched `v` to `u` instead, discard loops, and deduplicate parallel edges
+    (keeping one representative per endpoint pair). -/
 def contract {α β : Type*} [DecidableEq α] [DecidableEq β]
     (G : SimpleGraph α β) (u v : G.vertices) (h : u ≠ v) : SimpleGraph α β where
   vertices := V(G) \ {(v : α)}
   edges    :=
+    -- For each non-loop redirected endpoint pair, pick exactly one
+    -- representative edge (via Classical choice) to ensure simplicity.
     { e' | ∃ e ∈ E(G),
         e' = redirectEdge (u : α) (v : α) e ∧
-        ¬(redirectEdge (u : α) (v : α) e).endpoints.IsDiag }
+        ¬(redirectEdge (u : α) (v : α) e).endpoints.IsDiag ∧
+        -- Dedup: e is the chosen representative for this endpoint pair
+        (∀ e₂ ∈ E(G),
+          (redirectEdge (u : α) (v : α) e₂).endpoints =
+            (redirectEdge (u : α) (v : α) e).endpoints →
+          ¬(redirectEdge (u : α) (v : α) e₂).endpoints.IsDiag →
+          e₂ = e) }
   incidence := by
     intro e' he' w hw
     simp only [Set.mem_setOf_eq] at he'
-    obtain ⟨e, heG, rfl, hndg⟩ := he'
+    obtain ⟨e, heG, rfl, hndg, _⟩ := he'
     simp only [redirectEdge, Sym2.mem_map] at hw
     obtain ⟨x, hx, rfl⟩ := hw
     simp only [Set.mem_diff, Set.mem_singleton_iff]
@@ -49,21 +62,35 @@ def contract {α β : Type*} [DecidableEq α] [DecidableEq β]
     apply Set.Finite.to_subtype
     have hfin : (E(G) : Set (Edge α β)).Finite := Set.toFinite _
     have hpre : ({ e ∈ (E(G) : Set (Edge α β)) |
-        ¬(redirectEdge (u : α) (v : α) e).endpoints.IsDiag }).Finite :=
-      hfin.subset (Set.sep_subset _ _)
+        ¬(redirectEdge (u : α) (v : α) e).endpoints.IsDiag ∧
+        (∀ e₂ ∈ E(G),
+          (redirectEdge (u : α) (v : α) e₂).endpoints =
+            (redirectEdge (u : α) (v : α) e).endpoints →
+          ¬(redirectEdge (u : α) (v : α) e₂).endpoints.IsDiag →
+          e₂ = e) }).Finite :=
+      hfin.subset (fun e ⟨h, _⟩ => h)
     apply Set.Finite.subset (hpre.image (redirectEdge (u : α) (v : α)))
     intro e' he'
     simp only [Set.mem_setOf_eq] at he'
-    obtain ⟨e, heG, rfl, hndg⟩ := he'
-    exact Set.mem_image_of_mem _ ⟨heG, hndg⟩
+    obtain ⟨e, heG, rfl, hndg, hdedup⟩ := he'
+    exact Set.mem_image_of_mem _ ⟨heG, hndg, hdedup⟩
   loopless := by
     intro e' he'
     simp only [Set.mem_setOf_eq] at he'
-    obtain ⟨e, _, rfl, hndg⟩ := he'
+    obtain ⟨e, _, rfl, hndg, _⟩ := he'
     exact hndg
   simple := by
-    -- Contraction can create parallel edges; left as sorry.
-    sorry
+    rintro ⟨e', he', e'', he'', hid, hep⟩
+    simp only [Set.mem_setOf_eq] at he' he''
+    obtain ⟨e₁, he₁G, rfl, hndg₁, hdedup₁⟩ := he'
+    obtain ⟨e₂, he₂G, rfl, hndg₂, hdedup₂⟩ := he''
+    -- hep : (redirectEdge u v e₁).endpoints = (redirectEdge u v e₂).endpoints
+    -- hdedup₁ says e₁ is the unique edge redirecting to those endpoints
+    have := hdedup₁ e₂ he₂G hep.symm hndg₂
+    -- So e₂ = e₁
+    subst this
+    -- But then redirectEdge u v e₁ = redirectEdge u v e₁, so their ids are equal
+    exact hid rfl
 
 /-! ### Minors -/
 
