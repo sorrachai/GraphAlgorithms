@@ -1,423 +1,754 @@
+/-
+Copyright (c) 2024 Basil Rohner. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Basil Rohner
+-/
+
 import Mathlib.Tactic
 import Mathlib.Order.WithBot
 import Mathlib.Data.Sym.Sym2
 import Mathlib.Data.Finset.Basic
-
--- Undirected Graphs
--- Authors: Sorrachai Yingchareonthawornchai
+import Mathlib.Data.Multiset.Basic
+import Mathlib.Topology.ContinuousMap.Basic
 
 set_option tactic.hygienic false
-variable {α : Type*} {β : Type*} [DecidableEq α] [DecidableEq β]
+set_option linter.unusedSectionVars false
 
+-- TEMPORARY until graph definition fixed
+namespace Set.graphOn_nonempty
 
-structure UndirectedEdge (α β : Type*) where
+variable {α β : Type*} [DecidableEq α] [DecidableEq β]
+
+structure Edge (α β : Type*) where
   id : β
   endpoints : Sym2 α
-deriving DecidableEq
+  deriving DecidableEq
 
-abbrev Edge := UndirectedEdge
+class Graph (α β : Type*) where
+  vertices : Set α
+  edges : Set (Edge α β)
+  incidence : ∀ e ∈ edges, ∀ v ∈ e.endpoints, v ∈ vertices
 
-structure UndirectedGraph (α β : Type*) where
-  vertexSet : Finset α
-  edgeSet : Finset (Edge α β)
-  incidence : ∀ e ∈ edgeSet, ∀ v ∈ e.endpoints, v ∈ vertexSet
+scoped macro "V(" G:term ")" : term => `(($G).vertices)
+scoped macro "E(" G:term ")" : term => `(($G).edges)
 
+class FinGraph (α β : Type*) extends Graph α β where
+  fin_vertices : Finite vertices
+  fin_edges : Finite edges
 
-def UndirectedGraph.noParallel {α β} (G : UndirectedGraph α β) : Prop :=
-  ∀ e ∈ G.edgeSet, ∀ e' ∈ G.edgeSet, e.endpoints = e'.endpoints → e = e'
+class SimpleGraph (α β : Type*) extends FinGraph α β where
+  loopless : ∀ e ∈ edges, ¬e.endpoints.IsDiag
+  simple : ¬∃ e ∈ edges, ∃ e' ∈ edges, e.id ≠ e'.id ∧ e.endpoints = e'.endpoints
 
-def UndirectedGraph.LoopLess {α β} (G : UndirectedGraph α β) : Prop :=
-  ∀ e ∈ G.edgeSet, ¬ e.endpoints.IsDiag
+/-! ### Coercions between graph classes -/
 
-def UndirectedGraph.Simple {α β} (G : UndirectedGraph α β) : Prop := G.noParallel ∧ G.LoopLess
+@[reducible]
+instance instCoeFinGraphGraph {α β : Type*} : Coe (FinGraph α β) (Graph α β) :=
+  ⟨fun G => { vertices := G.vertices, edges := G.edges, incidence := G.incidence }⟩
 
---  To disallow multi-edges, define β as Unit
-abbrev NoParallelUndirectedGraph (α : Type*) := UndirectedGraph α Unit
+@[reducible]
+instance instCoeSimpleGraphFinGraph {α β : Type*} : Coe (SimpleGraph α β) (FinGraph α β) :=
+  ⟨fun G => { vertices := G.vertices, edges := G.edges, incidence := G.incidence,
+               fin_vertices := G.fin_vertices, fin_edges := G.fin_edges }⟩
 
-def SimpleGraph (α : Type*) :=
-  { G : NoParallelUndirectedGraph α // ∀ e ∈ G.edgeSet, ¬ e.endpoints.IsDiag }
+@[reducible]
+instance instCoeSimpleGraphGraph {α β : Type*} : Coe (SimpleGraph α β) (Graph α β) :=
+  ⟨fun G => { vertices := G.vertices, edges := G.edges, incidence := G.incidence }⟩
 
+/-! ### FinGraph helpers -/
 
+/-- The vertex set of a `FinGraph` as a `Finset`. -/
+noncomputable def FinGraph.vertexFinset {α β : Type*} (G : FinGraph α β) : Finset α :=
+  (Set.finite_coe_iff.mp G.fin_vertices).toFinset
 
+/-- The edge set of a `FinGraph` as a `Finset`. -/
+noncomputable def FinGraph.edgeFinset {α β : Type*} (G : FinGraph α β) : Finset (Edge α β) :=
+  (Set.finite_coe_iff.mp G.fin_edges).toFinset
 
+@[simp] lemma FinGraph.mem_vertexFinset {α β : Type*} (G : FinGraph α β) (v : α) :
+    v ∈ G.vertexFinset ↔ v ∈ G.vertices := by
+  simp [FinGraph.vertexFinset, Set.Finite.mem_toFinset]
 
-namespace UndirectedGraph
+@[simp] lemma FinGraph.mem_edgeFinset {α β : Type*} (G : FinGraph α β) (e : Edge α β) :
+    e ∈ G.edgeFinset ↔ e ∈ G.edges := by
+  simp [FinGraph.edgeFinset, Set.Finite.mem_toFinset]
 
-open Finset
+scoped notation "VF(" G ")" => FinGraph.vertexFinset G
+scoped notation "EF(" G ")" => FinGraph.edgeFinset G
 
-/-- `V(G)` denotes the `vertexSet` of a graph `G`. -/
-scoped notation "V(" G ")" => UndirectedGraph.vertexSet G
+/-! ### Incidence and degree -/
 
-/-- `E(G)` denotes the `edgeSet` of a graph `G`. -/
-scoped notation "E(" G ")" => UndirectedGraph.edgeSet G
+/-- Edges incident to vertex `v` in `G`. -/
+noncomputable abbrev incidentEdges {α β : Type*} [DecidableEq α] (G : FinGraph α β) (v : α) :
+    Finset (Edge α β) :=
+  EF(G).filter (fun e => v ∈ e.endpoints)
 
-abbrev IncidentEdgeSet (G : UndirectedGraph α β) (s : α) :
-  Finset (Edge α β) := {e ∈ E(G) | s ∈ e.endpoints}
+scoped notation "δ(" G "," v ")" => incidentEdges G v
+set_option quotPrecheck false in
+scoped notation "deg(" G "," v ")" => Finset.card (δ(G, v))
 
-/-- `δ(G,v)` denotes the `edge-incident-set` of a vertex `v` in `G`. -/
+/-- Neighbors of `v` in `G`. -/
+noncomputable abbrev neighbors {α β : Type*} [DecidableEq α] (G : FinGraph α β) (v : α) :
+    Finset α :=
+  VF(G).filter (fun u => ∃ e ∈ EF(G), v ∈ e.endpoints ∧ u ∈ e.endpoints ∧ u ≠ v)
 
-scoped notation "δ(" G "," v ")" => UndirectedGraph.IncidentEdgeSet G v
+scoped notation "N(" G "," v ")" => neighbors G v
 
-abbrev Neighbors (G : UndirectedGraph α β) (s : α) :
-  Finset α := {u ∈ V(G) | ∃ e ∈ E(G), s ∈ e.endpoints ∧ u ∈ e.endpoints ∧ u ≠ s}
-
-/-- `N(G,v)` denotes the `neighbors` of a graph `G`. -/
-scoped notation "N(" G "," v ")" => UndirectedGraph.Neighbors G v
-
-/-- `deg(G)` denotes the `degree` of a graph `G`. -/
-scoped notation "deg(" G "," v ")" => #δ(G,v)
-
-abbrev subgraphOf (H G : UndirectedGraph α β) : Prop :=
+/-- `H` is a subgraph of `G`. -/
+abbrev subgraphOf {α β : Type*} (H G : Graph α β) : Prop :=
   V(H) ⊆ V(G) ∧ E(H) ⊆ E(G)
 
-scoped infix:50 " ⊆ᴳ " => UndirectedGraph.subgraphOf
+scoped infix:50 " ⊆ᴳ " => subgraphOf
 
-/-- A walk is an alternating sequence of vertices and incident edges.  For vertices `u v : V`,
-the type `walk u v` consists of all walks starting at `u` and ending at `v`.
-Note that this definition does not depend on the graph.
+/-! ### Adjacency -/
+
+/-- Two vertices are **adjacent** in `G` if some edge of `G` has both as endpoints. -/
+def adj {α β : Type*} (G : Graph α β) (u v : α) : Prop :=
+  ∃ e ∈ E(G), u ∈ e.endpoints ∧ v ∈ e.endpoints
+
+/-! ### Complement -/
+
+/-- Two graphs on the same vertex set are **complements** if, for every pair of
+    distinct vertices, exactly one of the two graphs contains an edge between them. -/
+def IsComplement {α β : Type*} (G H : SimpleGraph α β) : Prop :=
+  V(G) = V(H) ∧
+  ∀ u ∈ V(G), ∀ v ∈ V(G), u ≠ v →
+    (adj (G : Graph α β) u v ↔ ¬adj (H : Graph α β) u v)
+
+/-! ### Graph homomorphism and isomorphism -/
+
+/-- `G` is **homomorphic** to `H`: there exists a map `φ : α → γ` sending `V(G)` into
+    `V(H)` that preserves adjacency. -/
+def IsHomomorphic {α β γ δ : Type*} (G : SimpleGraph α β) (H : SimpleGraph γ δ) : Prop :=
+  ∃ φ : α → γ,
+    (∀ v ∈ V(G), φ v ∈ V(H)) ∧
+    (∀ u ∈ V(G), ∀ v ∈ V(G), adj (G : Graph α β) u v →
+      adj (H : Graph γ δ) (φ u) (φ v))
+
+/-- `G` is **isomorphic** to `H`: there exists a bijection `φ` between `V(G)` and
+    `V(H)` that preserves and reflects adjacency. -/
+def IsIsomorphic {α β γ δ : Type*} (G : SimpleGraph α β) (H : SimpleGraph γ δ) : Prop :=
+  ∃ (φ : α → γ) (ψ : γ → α),
+    (∀ v ∈ V(G), φ v ∈ V(H)) ∧
+    (∀ v ∈ V(H), ψ v ∈ V(G)) ∧
+    (∀ v ∈ V(G), ψ (φ v) = v) ∧
+    (∀ v ∈ V(H), φ (ψ v) = v) ∧
+    (∀ u ∈ V(G), ∀ v ∈ V(G),
+      adj (G : Graph α β) u v ↔ adj (H : Graph γ δ) (φ u) (φ v))
+
+scoped notation:50 G " ≅ " H => IsIsomorphic G H
+
+/-! ### Connectivity and induced subgraphs -/
+
+/-
+  **TODO**: Define paths first and then quantify over paths directly
+  instead of reflexive transitive closure on adjacency relation.
 -/
+
+/-- `G` is **connected** if every pair of vertices is joined by the reflexive-transitive
+    closure of the adjacency relation (i.e. by a walk in `G`). -/
+def IsConnected {α β : Type*} (G : SimpleGraph α β) : Prop :=
+  ∀ u ∈ V(G), ∀ v ∈ V(G),
+    Relation.ReflTransGen
+      (fun x y => ∃ e ∈ E(G), x ∈ e.endpoints ∧ y ∈ e.endpoints)
+      u v
+
+/-- The **induced subgraph** `G[S]`: keep only vertices in `V(G) ∩ S` and edges
+    with both endpoints in `S`. -/
+def induce {α β : Type*} (G : SimpleGraph α β) (S : Set α) : SimpleGraph α β where
+  vertices   := V(G) ∩ S
+  edges      := { e ∈ E(G) | ∀ v ∈ e.endpoints, v ∈ S }
+  incidence  := by
+    intro e ⟨heG, hS⟩ v hv
+    exact ⟨G.incidence e heG v hv, hS v hv⟩
+  fin_vertices := by
+    haveI : Finite ↥V(G) := G.fin_vertices
+    exact Finite.of_injective (Set.inclusion Set.inter_subset_left)
+      (Set.inclusion_injective _)
+  fin_edges := by
+    haveI : Finite ↥E(G) := G.fin_edges
+    exact Finite.of_injective (Set.inclusion (Set.sep_subset _ _))
+      (Set.inclusion_injective _)
+  loopless   := fun e ⟨heG, _⟩ => G.loopless e heG
+  simple     := by
+    rintro ⟨e, ⟨heG, _⟩, e', ⟨he'G, _⟩, hid, heq⟩
+    exact G.simple ⟨e, heG, e', he'G, hid, heq⟩
+
+scoped notation G "[" S "]" => induce G S
+
+/-! ## Walks, Paths, and Cycles -/
+
+/-- A **walk** from `u` to `v` is an alternating sequence of vertices and
+    incident edges.  Walks are defined independently of any graph; the
+    predicate `Walk.InGraph` restricts a walk to lie inside a given graph. -/
 inductive Walk (α β : Type*) : α → α → Type _ where
-  | nil {u : α} : Walk α β u u
+  | nil  {u : α} : Walk α β u u
   | cons {u v w : α} (e : Edge α β) :
       u ∈ e.endpoints → w ∈ e.endpoints → Walk α β w v → Walk α β u v
 
-scoped notation:50 "(" u "," v ")-Walk-("a "," b ")" => Walk a b u v
+scoped notation:50 "(" u "," v ")-Walk-(" a "," b ")" => Walk a b u v
 
 namespace Walk
 
 @[trans]
-def append {u v w : α} : (u,v)-Walk-(α,β) → (v,w)-Walk-(α,β) → (u,w)-Walk-(α,β)
-  | nil, q => q
-  | cons e ht hh p, q => cons e ht hh (p.append q)
+def append {u v w : α} : (u, v)-Walk-(α, β) → (v, w)-Walk-(α, β) → (u, w)-Walk-(α, β)
+  | nil,            q => q
+  | cons e h1 h2 p, q => cons e h1 h2 (p.append q)
 
-def reverse {u v : α} : (u,v)-Walk-(α,β) → (v,u)-Walk-(α,β)
-  | nil => nil
+def reverse {u v : α} : (u, v)-Walk-(α, β) → (v, u)-Walk-(α, β)
+  | nil            => nil
   | cons e h1 h2 p => p.reverse.append (cons e h2 h1 nil)
 
-def InGraph {u v} (G : UndirectedGraph α β) :  (u,v)-Walk-(α,β) → Prop
-  | nil => u ∈ V(G)  --
-  | cons e _ _ rest => e ∈ E(G) ∧ rest.InGraph G
+/-- A walk lies **inside a graph** if every edge it traverses is in `E(G)`.
+    For `nil`, we additionally require that the base vertex is in `V(G)`. -/
+def InGraph {u v : α} (G : Graph α β) : (u, v)-Walk-(α, β) → Prop
+  | nil          => u ∈ G.vertices
+  | cons e _ _ p => e ∈ G.edges ∧ p.InGraph G
 
-example {H G u v} (h : H ⊆ᴳ G) (p : (u,v)-Walk-(α,β)) (hp : p.InGraph H) : p.InGraph G := by
-  induction p <;> aesop (add simp [subgraphOf, Walk.InGraph])
+/-- Number of edges in the walk. -/
+def length {u v : α} : (u, v)-Walk-(α, β) → ℕ
+  | nil           => 0
+  | cons _ _ _ p  => 1 + p.length
 
-/-- The number of edges in the walk. -/
-def length {u v : α} : (u,v)-Walk-(α,β) → ℕ
-  | Walk.nil => 0
-  | Walk.cons _ _ _ p => 1 + p.length
-
-/-- The list of vertices visited by the walk, in order. -/
-def support {u v : α} : (u,v)-Walk-(α,β)  → List α
-  | nil => [u]
-  -- We explicitly capture 'v' (the current start) and 'p' (the rest of the walk)
+/-- Ordered list of vertices visited (starting with `u`). -/
+def support {u v : α} : (u, v)-Walk-(α, β) → List α
+  | nil                   => [u]
   | cons (u := u) _ _ _ p => u :: p.support
 
-/-- The list of edges traversed by the walk, in order. -/
-def edges {u v : α} : (u,v)-Walk-(α,β) → List (Edge α β)
-  | nil => []
-  | cons e _ _ p => e :: p.edges
+/-- Ordered list of edges traversed. -/
+def edges {u v : α} : (u, v)-Walk-(α, β) → List (Edge α β)
+  | nil           => []
+  | cons e _ _ p  => e :: p.edges
 
-lemma length_support {α β} {u v : α} (p : (u,v)-Walk-(α,β)) :
-  p.support.length = p.length + 1 := by
+lemma length_support {u v : α} (p : (u, v)-Walk-(α, β)) :
+    p.support.length = p.length + 1 := by
   induction p with
   | nil => rfl
-  | cons _ _ _ p_tail ih =>
-    -- Simply unfold definitions and use the inductive hypothesis
-    simp [support, length, ih]
-    omega
+  | cons _ _ _ _ ih => simp [support, length, ih]; omega
 
-lemma mem_support_start {α β} {u v : α} (p : (u,v)-Walk-(α,β)) :
-  u ∈ p.support := by
+lemma mem_support_start {u v : α} (p : (u, v)-Walk-(α, β)) : u ∈ p.support := by
+  cases p <;> simp [support]
+
+lemma mem_support_end {u v : α} (p : (u, v)-Walk-(α, β)) : v ∈ p.support := by
   induction p with
-  | nil => simp [support]
-  | cons e hv hw p ih => simp [support]
+  | nil           => simp [support]
+  | cons _ _ _ _ ih => simp [support, ih]
 
-lemma mem_support_end {α β} {u v : α} (p : (u,v)-Walk-(α,β)) :
-  v ∈ p.support := by
+lemma InGraph_mono {H G : Graph α β} {u v : α}
+    (hsub : H ⊆ᴳ G) (p : (u, v)-Walk-(α, β)) (hp : p.InGraph H) :
+    p.InGraph G := by
   induction p with
-  | nil => simp [support]
-  | cons e hv hw p ih => simp_all [support]
+  | nil => exact hsub.1 hp
+  | cons e h1 h2 p' ih => exact ⟨hsub.2 hp.1, ih hp.2⟩
 
+/-- A walk is a **path** if its vertex support has no repeated entries. -/
+def isPath {u v : α} (p : (u, v)-Walk-(α, β)) : Prop := p.support.Nodup
 
-
-def is_path {u v : α} (p : (u,v)-Walk-(α,β)) : Prop := p.support.Nodup
-
-
---We only consider cycles in simple graphs.
-def is_cycle {u : α} (p : (u,u)-Walk-(α,β)) : Prop :=
+/-- A closed walk is a **cycle** if it has at least three edges and no repeated
+    vertex other than the start/end. -/
+def isCycle {u : α} (p : (u, u)-Walk-(α, β)) : Prop :=
   p.length ≥ 3 ∧ p.support.tail.Nodup
 
-abbrev Path (α β : Type*) (u v : α) := { p : (u,v)-Walk-(α,β) // Walk.is_path p }
-scoped notation:50 "(" u "," v ")-Path-("a "," b ")" => Path a b u v
+abbrev Path (α β : Type*) (u v : α) := { p : (u, v)-Walk-(α, β) // p.isPath }
+scoped notation:50 "(" u "," v ")-Path-(" a "," b ")" => Path a b u v
 
-instance {α β : Type*} {u v : α} :
-    Coe (Path α β u v) (Walk α β u v) where
-  coe p := p.1
+instance {u v : α} : Coe (Path α β u v) (Walk α β u v) := ⟨(·.1)⟩
 
-@[simp] lemma coe_mk {α β : Type*} {u v : α}
-  (p : Walk α β u v) (hp : Walk.is_path p) :
-  ((⟨p, hp⟩ : Path α β u v) : Walk α β u v) = p := rfl
+@[simp] lemma coe_path_mk {u v : α} (p : Walk α β u v) (hp : p.isPath) :
+    ((⟨p, hp⟩ : Path α β u v) : Walk α β u v) = p := rfl
 
-/-- Given a vertex in the support of a path, give the path from (and including) that vertex to
-the end. In other words, drop vertices from the front of a path until (and not including)
-that vertex. -/
+/-- Drop the walk until (not including) vertex `x`. -/
 def dropUntil {v u : α} :
-    ∀ (p : (v,u)-Walk-(α,β)) (x : α), x ∈ p.support → (x,u)-Walk-(α,β)
-  | nil, x, hx => by
-      have hx' : x = v := by simpa [support] using hx
-      subst hx'
-      exact Walk.nil
+    ∀ (p : (v, u)-Walk-(α, β)) (x : α), x ∈ p.support → (x, u)-Walk-(α, β)
+  | nil,            x, hx => by simp [support] at hx; subst hx; exact nil
   | cons e hv hw p, x, hx => by
       by_cases h : x = v
-      · subst h
-        exact Walk.cons e hv hw p
-      · have hx_tail : x ∈ p.support := by
-          have hx_cons := (List.mem_cons).1 hx
-          cases hx_cons with
-          | inl hx_eq =>
-              exact (h hx_eq).elim
-          | inr hx' =>
-              exact hx'
-        exact dropUntil p x hx_tail
+      · subst h; exact cons e hv hw p
+      · exact dropUntil p x
+          (List.mem_cons.mp hx |>.resolve_left h)
 
--- dropUntil gives a path if the original walk is a path
-lemma dropUntil_preserves_path {u v : α} {p : (u,v)-Walk-(α,β)} (hp : p.is_path)
-  (x : α) (hx : x ∈ p.support) :
-  (p.dropUntil x hx).is_path := by
-  dsimp [Walk.is_path] at hp ⊢
-  induction p generalizing x with
+lemma dropUntil_isPath {u v : α} {p : (u, v)-Walk-(α, β)} (hp : p.isPath)
+    (x : α) (hx : x ∈ p.support) : (p.dropUntil x hx).isPath := by
+  induction p with
   | nil =>
-      have hx' : x = u_1 := by
-        simp_all [support]
-      subst hx'
-      simp [dropUntil, support]
+    simp [support] at hx; subst hx
+    simp [dropUntil, support, isPath]
   | cons e hv hw p_tail ih =>
-      have hp_tail : p_tail.support.Nodup := (List.nodup_cons).1 (by simpa [support] using hp) |>.2
-      by_cases h : x = u_1
-      · subst h
-        simp_all [dropUntil, support]
-      · simp_all [dropUntil, support]
+    have hp_tail : p_tail.support.Nodup :=
+      (List.nodup_cons.mp (by simpa [isPath, support] using hp)).2
+    by_cases h : x = u
+    · subst h
+      simp [dropUntil, isPath]
+      aesop
+    · simp only [dropUntil, h, ↓reduceDIte]
+      aesop
 
-def bypass {u v : α} :  (u,v)-Walk-(α,β) → (u,v)-Walk-(α,β)
-  | nil => nil
+/-- The **bypass** of a walk: recursively short-circuits back-edges to produce a path. -/
+def bypass {u v : α} : (u, v)-Walk-(α, β) → (u, v)-Walk-(α, β)
+  | nil           => nil
   | cons e h1 h2 p =>
     let p' := p.bypass
     if hs : u ∈ p'.support then p'.dropUntil u hs
     else cons e h1 h2 p'
 
-
-lemma bypass_is_path {u v : α} (p : (u,v)-Walk-(α,β)) : p.bypass.is_path := by
+lemma bypass_isPath {u v : α} (p : (u, v)-Walk-(α, β)) : p.bypass.isPath := by
   induction p with
-  | nil => simp! [is_path]
-  | cons e h1 h2 p =>
+  | nil => simp [isPath, bypass, support]
+  | cons e h1 h2 p ih =>
     simp only [bypass]
     split_ifs with hs
-    · exact dropUntil_preserves_path a_ih u_1 hs
-    · simp_all [is_path, support]
+    · exact dropUntil_isPath ih _ hs
+    · simp only [isPath, support, List.nodup_cons]
+      exact ⟨hs, ih⟩
 
-def to_path {u v : α} (p : (u,v)-Walk-(α,β)) : (u,v)-Path-(α,β) :=
-  ⟨p.bypass, p.bypass_is_path⟩
+/-- Extract a path from any walk by applying `bypass`. -/
+def toPath {u v : α} (p : (u, v)-Walk-(α, β)) : (u, v)-Path-(α, β) :=
+  ⟨p.bypass, p.bypass_isPath⟩
 
-def to_cycle? {u : α} : (u,u)-Walk-(α,β) → Option ((u,u)-Walk-(α,β))
-  | nil => none
+/-- Try to extract a cycle of length ≥ 3 from a closed walk;
+    returns `none` if the walk is too short. -/
+def toCycle? {u : α} : (u, u)-Walk-(α, β) → Option ((u, u)-Walk-(α, β))
+  | nil           => none
   | cons e hv hw p =>
-      let p' := p.bypass
-      let q : (u,u)-Walk-(α,β) := Walk.cons e hv hw p'
-      if q.length ≥ 3 then some q else none
+    let q := Walk.cons e hv hw p.bypass
+    if q.length ≥ 3 then some q else none
 
-lemma to_cycle?_is_cycle
-  {u : α} (p : (u,u)-Walk-(α,β)) (q : (u,u)-Walk-(α,β))
-  (h : p.to_cycle? = some q) :
-  q.is_cycle := by
-  dsimp [to_cycle?] at h
+lemma toCycle?_isCycle {u : α} (p q : (u, u)-Walk-(α, β))
+    (h : p.toCycle? = some q) : q.isCycle := by
+  simp only [toCycle?] at h
   cases p with
-  | nil => simp_all
+  | nil => simp at h
   | cons e hu hw p =>
-    simp at h; rcases h with ⟨h1, h2⟩; rw[h2] at h1
-    simp_all [is_cycle]
-    rw[<-h2]; simp [support]
-    have := bypass_is_path p; simp_all [is_path]
-
-
+    simp only at h
+    split_ifs at h with hlen
+    · simp only [Option.some.injEq] at h; subst h
+      exact ⟨hlen, by simp [support]; exact bypass_isPath p⟩
 
 end Walk
 
+/-! ## Connectivity and acyclicity -/
 
+/-- Two vertices are **reachable** in `G` if there is a walk between them in `G`. -/
+def Reachable (G : Graph α β) (u v : α) : Prop :=
+  ∃ p : (u, v)-Walk-(α, β), p.InGraph G
 
+/-- `G` is **preconnected** if every pair of vertices in `V(G)` is reachable
+    from one another. -/
+def PreConnected (G : Graph α β) : Prop :=
+  ∀ u ∈ V(G), ∀ v ∈ V(G), Reachable G u v
 
-def Reachable (G : UndirectedGraph α β) (u v : α) : Prop := ∃ p : (u,v)-Walk-(α,β), p.InGraph G
-
-def PreConnected (G : UndirectedGraph α β) : Prop :=
-  ∀ u v : α, (u ∈ V(G) ∧ v ∈ V(G)) → Reachable G u v
-
-def Acyclic (G : UndirectedGraph α β) : Prop :=
-  ∀ u ∈ V(G), ¬ ∃ (p : (u,u)-Walk-(α,β)), p.InGraph G ∧ p.is_cycle
-
-
+/-- `G` is **acyclic** if it contains no cycle. -/
+def Acyclic (G : Graph α β) : Prop :=
+  ∀ u ∈ V(G), ¬∃ (p : (u, u)-Walk-(α, β)), p.InGraph G ∧ p.isCycle
 
 namespace Walk
 
-theorem distinct_path_implies_cyclic {G : UndirectedGraph α β} {u v : α}
-  (p q : Path α β u v) (hpq : p ≠ q) (huv : u ≠ v)
-  (hp : p.1.InGraph G) (hq : q.1.InGraph G) (hG : Simple G) :
-  ¬ G.Acyclic := by
+/-- Two distinct paths between the same endpoints in a simple graph imply
+    the existence of a cycle. -/
+theorem distinct_paths_imply_cyclic {G : SimpleGraph α β} {u v : α}
+    (p q : Path α β u v) (hpq : p ≠ q) (huv : u ≠ v)
+    (hp : p.1.InGraph G) (hq : q.1.InGraph G) :
+    ¬Acyclic (G : Graph α β) := by
   sorry
 
 end Walk
 
+/-! ## Trees and forests -/
 
-def Cut (G : UndirectedGraph α β) (U : Finset α) :
-  Finset (Edge α β) := {e ∈ E(G) | ∃ u ∈ U, u ∈ e.endpoints ∧ ∃ v ∈ V(G) \ U, v ∈ e.endpoints}
+def isTree (G : SimpleGraph α β) : Prop := PreConnected (G : Graph α β) ∧ Acyclic (G : Graph α β)
+def isForest (G : SimpleGraph α β) : Prop := Acyclic (G : Graph α β)
 
-def is_tree (G : UndirectedGraph α β) : Prop := G.PreConnected ∧ G.Acyclic
-
-def is_forest (G : UndirectedGraph α β) : Prop := G.Acyclic
-
-abbrev Tree (α β : Type*) := { G : UndirectedGraph α β // is_tree G }
-abbrev Forest (α β : Type*) := { G : UndirectedGraph α β // is_forest G }
--- cuts, contractions
+abbrev Tree (α β : Type*) := { G : SimpleGraph α β // isTree G }
+abbrev Forest (α β : Type*) := { G : SimpleGraph α β // isForest G }
 
 namespace Tree
 
-instance {α β : Type*} : Coe (Tree α β) (UndirectedGraph α β) where
-  coe T := T.1
+instance : Coe (Tree α β) (SimpleGraph α β) := ⟨(·.1)⟩
 
-@[simp] lemma coe_mk {α β : Type*}
-  (G : UndirectedGraph α β) (h : is_tree G) :
-  ((⟨G, h⟩ : Tree α β) : UndirectedGraph α β) = G := rfl
-
+@[simp] lemma coe_mk (G : SimpleGraph α β) (h : isTree G) :
+    ((⟨G, h⟩ : Tree α β) : SimpleGraph α β) = G := rfl
 
 end Tree
 
-namespace Cut
-open Finset BigOperators
+/-! ### Equivalent characterisations of trees
 
-variable {R} [AddCommMonoid R] [CompleteLattice R] [CanonicallyOrderedAdd R]
+A non-empty finite simple graph satisfies any two of the following three
+properties if and only if it satisfies all three:
+  (T1) connected,
+  (T2) acyclic,
+  (T3) `|E| = |V| - 1`.
+Additionally, all three are equivalent to:
+  (T4) every pair of vertices is connected by a unique path.
+-/
 
-def weight (G : UndirectedGraph α β) (U : Finset α) (w : Edge α β → R) : R :=
-  Finset.sum (Cut G U) w
+/-- **(T1 ∧ T3) → T2**: connected with `|E| = |V| - 1` implies acyclic. -/
+theorem acyclic_of_connected_card (G : SimpleGraph α β)
+    (hconn : PreConnected (G : Graph α β))
+    (hcard : EF((G : FinGraph α β)).card + 1 = VF((G : FinGraph α β)).card) :
+    Acyclic (G : Graph α β) := by
+  sorry
 
+/-- **(T2 ∧ T3) → T1**: acyclic with `|E| = |V| - 1` implies connected. -/
+theorem connected_of_acyclic_card (G : SimpleGraph α β)
+    (hacyc : Acyclic (G : Graph α β))
+    (hcard : EF((G : FinGraph α β)).card + 1 = VF((G : FinGraph α β)).card) :
+    PreConnected (G : Graph α β) := by
+  sorry
 
--- def size (G : UndirectedGraph α β) (U : Finset α) : ℕ := (Cut G U).card
+/-- **(T1 ∧ T2) → T3**: connected and acyclic implies `|E| = |V| - 1`. -/
+theorem card_of_connected_acyclic (G : SimpleGraph α β)
+    (hconn : PreConnected (G : Graph α β))
+    (hacyc : Acyclic (G : Graph α β)) :
+    EF((G : FinGraph α β)).card + 1 = VF((G : FinGraph α β)).card := by
+  sorry
 
+/-- A tree is equivalently: connected with `|E| = |V| - 1`. -/
+theorem isTree_iff_connected_card (G : SimpleGraph α β) :
+    isTree G ↔ PreConnected (G : Graph α β) ∧
+      EF((G : FinGraph α β)).card + 1 = VF((G : FinGraph α β)).card :=
+  ⟨fun ⟨hconn, hacyc⟩ => ⟨hconn, card_of_connected_acyclic G hconn hacyc⟩,
+   fun ⟨hconn, hcard⟩ => ⟨hconn, acyclic_of_connected_card G hconn hcard⟩⟩
 
-lemma cut_submodular_grind (G : UndirectedGraph α β) (U W : Finset α) (w : Edge α β → R) :
-  weight G (U ∩ W) w + weight G (U ∪ W) w ≤ weight G U w + weight G W w := by
-  have h1 : Cut G (U ∩ W) ⊆ Cut G U ∪ Cut G W := by grind [Cut]
-  have h2 : Cut G (U ∪ W) ⊆ Cut G U ∪ Cut G W := by grind [Cut]
-  have h3 : Cut G (U ∩ W) ∩ Cut G (U ∪ W) ⊆ Cut G U ∩ Cut G W := by grind [Cut]
-  have h : (G.Cut (U ∩ W)) ∪ (G.Cut (U ∪ W)) ⊆ (G.Cut U) ∪ (G.Cut W) := by apply union_subset h1 h2
-  clear h1 h2
-  repeat unfold weight
-  rw[<-Finset.sum_union_inter]
-  nth_rw 2 [<-Finset.sum_union_inter]
-  have h3 : Finset.sum (G.Cut (U ∩ W) ∩ G.Cut (U ∪ W)) w ≤ Finset.sum (G.Cut U ∩ G.Cut W) w := by
-    apply Finset.sum_le_sum_of_subset h3
-  have h : Finset.sum (G.Cut (U ∩ W) ∪ G.Cut (U ∪ W)) w ≤ Finset.sum (G.Cut U ∪ G.Cut W) w := by
-    apply Finset.sum_le_sum_of_subset h
-  apply add_le_add h h3
+/-- A tree is equivalently: acyclic with `|E| = |V| - 1`. -/
+theorem isTree_iff_acyclic_card (G : SimpleGraph α β) :
+    isTree G ↔ Acyclic (G : Graph α β) ∧
+      EF((G : FinGraph α β)).card + 1 = VF((G : FinGraph α β)).card :=
+  ⟨fun ⟨hconn, hacyc⟩ => ⟨hacyc, card_of_connected_acyclic G hconn hacyc⟩,
+   fun ⟨hacyc, hcard⟩ => ⟨connected_of_acyclic_card G hacyc hcard, hacyc⟩⟩
 
-lemma cut_submodular (G : UndirectedGraph α β) (U W : Finset α) (w : Edge α β → R) :
-  weight G (U ∩ W) w + weight G (U ∪ W) w ≤ weight G U w + weight G W w := by
-  have h1 : Cut G (U ∩ W) ⊆ Cut G U ∪ Cut G W := by
-    rintro e he
-    unfold Cut at he
-    simp at he
-    rcases he with ⟨h1, ⟨u, h2⟩⟩
-    rcases h2 with ⟨⟨huU, huW⟩, h2, v, ⟨h3, h4⟩, h5⟩
-    simp
-    by_cases hvU : v ∈ U
-    · right; apply h4 at hvU; unfold Cut; simp_all; use u; simp_all; use v
-    · left; unfold Cut; simp_all; use u; simp_all; use v
-  have h2 : Cut G (U ∪ W) ⊆ Cut G U ∪ Cut G W := by
-    rintro e he
-    unfold Cut at he
-    simp at he
-    rcases he with ⟨h1, ⟨u, h2⟩⟩
-    rcases h2 with ⟨hu, hu1, v, ⟨hv1, hv2, hv3⟩ , hv⟩
-    rcases hu with hu|hu
-    simp; left; unfold Cut; simp_all; use u; simp_all; use v
-    simp; right; unfold Cut; simp_all; use u; simp_all; use v
-  have h3 : Cut G (U ∩ W) ∩ Cut G (U ∪ W) ⊆ Cut G U ∩ Cut G W := by
-    rintro e he
-    simp at he
-    rcases he with ⟨he1, he2⟩
-    simp [Cut] at he1
-    rcases he1 with ⟨he, u, ⟨hu1, hu2⟩, hu3, v, ⟨hv1, hv2⟩, hv3⟩
-    have hne : u ≠ v := by by_contra!; subst this; simp_all
-    have huv : e.endpoints = s(u,v) := by
-      apply (Sym2.mem_and_mem_iff hne).1; simp_all
-    have hv4 : v ∉ U ∪ W := by
-      by_contra!
-      simp [Cut] at he2
-      rcases he2 with ⟨he', u', hu1', hu2', v', hv1', hv2'⟩
-      rw [huv] at hv2'
-      apply Sym2.mem_iff'.1 at hv2'
-      rcases hv2' with h|h;
-      simp_all; simp_all
-    simp; constructor
-    unfold Cut; simp_all; use u; simp_all; use v; simp_all
-    unfold Cut; simp_all; use u; simp_all; use v; simp_all
-  have h : (G.Cut (U ∩ W)) ∪ (G.Cut (U ∪ W)) ⊆ (G.Cut U) ∪ (G.Cut W) := by
-    apply union_subset h1 h2
-  clear h1 h2
-  repeat unfold weight
-  rw[<-Finset.sum_union_inter]
-  nth_rw 2 [<-Finset.sum_union_inter]
-  have h3 : Finset.sum (G.Cut (U ∩ W) ∩ G.Cut (U ∪ W)) w ≤ Finset.sum (G.Cut U ∩ G.Cut W) w := by
-    apply Finset.sum_le_sum_of_subset h3
-  have h : Finset.sum (G.Cut (U ∩ W) ∪ G.Cut (U ∪ W)) w ≤ Finset.sum (G.Cut U ∪ G.Cut W) w := by
-    apply Finset.sum_le_sum_of_subset h
-  apply add_le_add h h3
+/-- **(T4)**: every pair of vertices in `V(G)` is connected by exactly one path. -/
+def UniquePaths (G : SimpleGraph α β) : Prop :=
+  ∀ u ∈ V(G), ∀ v ∈ V(G),
+    ∃! p : (u, v)-Walk-(α, β), p.isPath ∧ p.InGraph G
 
-def is_st_cut (G : UndirectedGraph α β) (U : Finset α) (s t : α) : Prop :=
-  s ∈ U ∧ t ∉ U ∧ U.Nonempty ∧ U ⊂ V(G)
+/-- **(T1 ∧ T2) → T4**: a tree has unique paths. -/
+theorem uniquePaths_of_connected_acyclic (G : SimpleGraph α β)
+    (hconn : PreConnected (G : Graph α β))
+    (hacyc : Acyclic (G : Graph α β)) :
+    UniquePaths G := by
+  sorry
 
-def is_st_mincut (G : UndirectedGraph α β) (U : Finset α) (s t : α) (w : Edge α β → R) : Prop :=
-  is_st_cut G U s t ∧ ∀ W : Finset α, is_st_cut G W s t → weight G U w ≤ weight G W w
+/-- **(T4) → (T1 ∧ T2)**: unique paths imply connected and acyclic. -/
+theorem connected_acyclic_of_uniquePaths (G : SimpleGraph α β)
+    (huniq : UniquePaths G) :
+    PreConnected (G : Graph α β) ∧ Acyclic (G : Graph α β) := by
+  sorry
 
+/-- A tree is equivalently: every pair of vertices is connected by a unique path. -/
+theorem isTree_iff_uniquePaths (G : SimpleGraph α β) :
+    isTree G ↔ UniquePaths G :=
+  ⟨fun ⟨hconn, hacyc⟩ => uniquePaths_of_connected_acyclic G hconn hacyc,
+   fun huniq => connected_acyclic_of_uniquePaths G huniq⟩
 
-def st_mincut_value (G : UndirectedGraph α β) (s t : α) (w : Edge α β → R) : R :=
-  sInf { W : R | ∃ U : Finset α, is_st_cut G U s t ∧ weight G U w = W}
+/-! ## Graph parameters -/
 
-lemma st_min_cut {G : UndirectedGraph α β} {U : Finset α} {s t : α} {w : Edge α β → R} :
-  is_st_mincut G U s t w ↔ is_st_cut G U s t ∧ weight G U w = st_mincut_value G s t w  := by
-  constructor
-  · intro h; simp_all [is_st_mincut, st_mincut_value]
-    apply le_antisymm
-    apply le_sInf
-    · rintro b ⟨W, hb1, hb2⟩
-      rcases h with ⟨hcut, hmin⟩
-      have hW := hmin W hb1
-      simp_all
-    · apply sInf_le
-      use U; simp_all
-  · intro h
-    unfold is_st_mincut
-    simp_all; rintro W hW; unfold st_mincut_value
-    apply sInf_le; use W
+/-- A set `S ⊆ V(G)` is a **clique** if every two distinct vertices in `S` are adjacent. -/
+def IsClique (G : SimpleGraph α β) (S : Finset α) : Prop :=
+  (S : Set α) ⊆ V(G) ∧
+  ∀ u ∈ S, ∀ v ∈ S, u ≠ v → ∃ e ∈ E(G), u ∈ e.endpoints ∧ v ∈ e.endpoints
 
+/-- `ω(G)` — the **clique number**: the cardinality of a largest clique. -/
+noncomputable def cliqueNr (G : SimpleGraph α β) : ℕ :=
+  sSup { n : ℕ | ∃ S : Finset α, IsClique G S ∧ S.card = n }
 
-def is_gomory_hu
-  (G : UndirectedGraph α β) (wG : Edge α β → R)
-  (T : Tree α β) (wT : Edge α β → R) : Prop :=
-  V(T.1) = V(G) ∧
-  ∀ s t : α,
-    s ∈ V(G) → t ∈ V(G) → s ≠ t →
-    ∃ U : Finset α,
-      is_st_mincut G U s t wG ∧
-      is_st_mincut (T.1) U s t wT ∧
-      weight G U wG = weight (T.1) U wT
+scoped notation "ω(" G ")" => cliqueNr G
 
+/-- A set `S ⊆ V(G)` is **independent** if no two vertices of `S` share an edge. -/
+def IsIndependentSet (G : SimpleGraph α β) (S : Finset α) : Prop :=
+  (S : Set α) ⊆ V(G) ∧
+  ∀ u ∈ S, ∀ v ∈ S, u ≠ v → ¬∃ e ∈ E(G), u ∈ e.endpoints ∧ v ∈ e.endpoints
 
-end Cut
+/-- `α(G)` — the **independence number**: the cardinality of a largest independent set. -/
+noncomputable def independenceNr (G : SimpleGraph α β) : ℕ :=
+  sSup { n : ℕ | ∃ S : Finset α, IsIndependentSet G S ∧ S.card = n }
 
+scoped notation "α(" G ")" => independenceNr G
 
+/-! ## Special graph classes -/
 
+/-- `G` is **complete** if every pair of distinct vertices is joined by an edge. -/
+def IsComplete (G : SimpleGraph α β) : Prop :=
+  ∀ u ∈ V(G), ∀ v ∈ V(G), u ≠ v → ∃ e ∈ E(G), u ∈ e.endpoints ∧ v ∈ e.endpoints
 
+/-- `G` is **bipartite** if `V(G)` can be partitioned into two independent sets. -/
+def IsBipartite (G : SimpleGraph α β) : Prop :=
+  ∃ A B : Finset α, (A : Set α) ∪ B = V(G) ∧ Disjoint A B ∧
+    ∀ e ∈ E(G), (∃ u ∈ A, u ∈ e.endpoints) ∧ (∃ v ∈ B, v ∈ e.endpoints)
 
+/-- `G` is **`k`-regular** if every vertex has degree exactly `k`. -/
+def IsKRegular (G : SimpleGraph α β) (k : ℕ) : Prop :=
+  ∀ v ∈ V(G), deg((G : FinGraph α β), v) = k
 
+/-- A graph is bipartite iff it contains no odd cycle. -/
+theorem bipartite_iff_no_odd_cycle (G : SimpleGraph α β) :
+    IsBipartite G ↔
+    ∀ u ∈ V(G), ¬∃ (p : (u, u)-Walk-(α, β)), p.InGraph G ∧ p.isCycle ∧ ¬2 ∣ p.length := by
+  sorry
 
+/-! ## Connected components -/
 
+/-
+  **TODO**: This should be in the same space as connected.
+-/
 
-end UndirectedGraph
+/-- The connected-component equivalence relation on `V(G)`: two vertices are
+    related iff they are reachable from one another. -/
+def connSetoid (G : Graph α β) : Setoid { v // v ∈ V(G) } where
+  r u v := Reachable G u v
+  iseqv := {
+    refl  := fun ⟨v, hv⟩ => ⟨Walk.nil, hv⟩
+    symm  := fun ⟨p, hp⟩ => ⟨p.reverse, sorry⟩
+    trans := fun ⟨p, hp⟩ ⟨q, hq⟩ => ⟨p.append q, sorry⟩
+  }
+
+/-- The set of connected components of `G`. -/
+def ConnectedComponents (G : Graph α β) := Quotient (connSetoid G)
+
+/-- The number of connected components of a finite graph. -/
+noncomputable def numComponents (G : FinGraph α β) : ℕ := sorry
+
+/-! ## Vertex and edge separators -/
+
+/-
+  **TODO**: Inconsistency with `FinGraph` and `SimpleGraph`.
+  Need to change.
+-/
+
+/-- `S` is a **vertex separator** for `u` and `v` in `G`: removing `S` from `G`
+    disconnects `u` from `v`. -/
+def IsVertexSeparator (G : SimpleGraph α β) (S : Finset α) (u v : α) : Prop :=
+  u ∉ S ∧ v ∉ S ∧ ¬Reachable (G[V(G) \ ↑S] : Graph α β) u v
+
+/-- `F` is an **edge separator** for `u` and `v` in `G`: removing the edges
+    in `F` disconnects `u` from `v`. -/
+def IsEdgeSeparator (G : SimpleGraph α β) (F : Finset (Edge α β)) (u v : α) : Prop :=
+  ¬Reachable
+    ({ vertices := V(G), edges := E(G) \ ↑F,
+       incidence := fun e he w hw => G.incidence e (Set.diff_subset he) w hw } :
+     Graph α β) u v
+
+/-! ## Vertex and edge connectivity -/
+
+/-- `κ(G)` — the **vertex connectivity**: minimum size of a vertex separator
+    over all non-adjacent pairs, or `|V(G)| - 1` if `G` is complete. -/
+noncomputable def vertexConnectivity (G : SimpleGraph α β) : ℕ :=
+  sInf { k : ℕ | ∃ S : Finset α, S.card = k ∧
+    ∃ u ∈ V(G), ∃ v ∈ V(G), u ≠ v ∧ IsVertexSeparator G S u v }
+
+scoped notation "κ(" G ")" => vertexConnectivity G
+
+/-- `κ'(G)` — the **edge connectivity**: minimum size of an edge separator
+    that disconnects some pair of vertices. -/
+noncomputable def edgeConnectivity (G : SimpleGraph α β) : ℕ :=
+  sInf { k : ℕ | ∃ F : Finset (Edge α β), F.card = k ∧
+    ∃ u ∈ V(G), ∃ v ∈ V(G), u ≠ v ∧ IsEdgeSeparator G F u v }
+
+scoped notation "κ'(" G ")" => edgeConnectivity G
+
+/-- **Whitney's inequality**: `κ(G) ≤ κ'(G)`. -/
+theorem whitney_inequality (G : SimpleGraph α β) : κ(G) ≤ κ'(G) := sorry
+
+/-- **Menger's theorem** (vertex version): the maximum number of internally
+    vertex-disjoint `u`-`v` paths equals the minimum vertex separator size. -/
+theorem Menger_vertex (G : SimpleGraph α β) (u v : α)
+    (hu : u ∈ V(G)) (hv : v ∈ V(G)) (huv : u ≠ v) (hna : ¬adj (G : Graph α β) u v) :
+    sInf { k | ∃ S : Finset α, S.card = k ∧ IsVertexSeparator G S u v } =
+    sSup { k | ∃ paths : Fin k → { p : Walk α β u v // p.isPath },
+      (∀ i, (paths i).1.InGraph (G : Graph α β)) ∧
+      ∀ i j, i ≠ j → Disjoint
+        ((paths i).1.support.tail.dropLast.toFinset)
+        ((paths j).1.support.tail.dropLast.toFinset) } := sorry
+
+/-! ## Induced cycles, holes, and antiholes -/
+
+/-- `G` has an **induced cycle** of length `n ≥ 3`: a cycle on `n` vertices
+    such that the only edges of `G` among those vertices are the cycle edges. -/
+def HasInducedCycle (G : SimpleGraph α β) (n : ℕ) : Prop :=
+  n ≥ 3 ∧ ∃ (u : α) (p : (u, u)-Walk-(α, β)),
+    p.InGraph (G : Graph α β) ∧ p.isCycle ∧ p.length = n ∧
+    ∀ x ∈ p.support.tail, ∀ y ∈ p.support.tail, x ≠ y →
+      adj (G : Graph α β) x y →
+      ∃ e ∈ p.edges, x ∈ e.endpoints ∧ y ∈ e.endpoints
+
+/-- A **hole** of length `n ≥ 5` in `G`. -/
+def HasHole (G : SimpleGraph α β) (n : ℕ) : Prop :=
+  HasInducedCycle G n ∧ n ≥ 5
+
+/-- `G` has an **odd hole**: an induced cycle of odd length ≥ 5. -/
+def HasOddHole (G : SimpleGraph α β) : Prop :=
+  ∃ n, HasHole G n ∧ ¬2 ∣ n
+
+/-- `G` has an **antihole** of length `n ≥ 5`: an induced subgraph on `n`
+    vertices whose complement is a cycle `Cₙ`.  Equivalently, `n` vertices
+    `v₀, …, vₙ₋₁` where `vᵢ` and `vⱼ` are adjacent in `G` iff `|i-j| ≥ 2`
+    (indices mod `n`). -/
+def HasAntihole (G : SimpleGraph α β) (n : ℕ) : Prop :=
+  n ≥ 5 ∧ ∃ (verts : ZMod n → α),
+    Function.Injective verts ∧
+    (∀ i, verts i ∈ V(G)) ∧
+    (∀ i j : ZMod n, i ≠ j →
+      (adj (G : Graph α β) (verts i) (verts j) ↔
+        ¬(j = i + 1 ∨ i = j + 1)))
+
+/-
+  Note: I have this here to formalize the **Strong Perfect Graph Theorem**.
+-/
+
+/-- `G` has an **odd antihole**: an antihole of odd length ≥ 5. -/
+def HasOddAntihole (G : SimpleGraph α β) : Prop :=
+  ∃ n, HasAntihole G n ∧ ¬2 ∣ n
+
+/-! ## Tree decomposition and tree-width -/
+
+/-- A **tree decomposition** of `G` consists of a tree `T` and a map `bag`
+    associating to each node of `T` a subset of `V(G)`, satisfying:
+    1. Every vertex of `G` appears in some bag.
+    2. For every edge of `G`, both endpoints appear together in some bag.
+    3. For each vertex `v`, the set of nodes whose bags contain `v` induces
+       a connected subtree of `T`. -/
+structure TreeDecomp (α β : Type*) [DecidableEq α] [DecidableEq β]
+    (G : SimpleGraph α β)
+    (γ : Type*) (δ : Type*) [DecidableEq γ] [DecidableEq δ] where
+  tree : Tree γ δ
+  bag : γ → Finset α
+  covers_vertices : ∀ v ∈ V(G), ∃ t ∈ V(tree.1), v ∈ bag t
+  covers_edges : ∀ e ∈ E(G), ∃ t ∈ V(tree.1),
+    ∀ v ∈ e.endpoints, v ∈ bag t
+  connected_bags : ∀ v ∈ V(G),
+    ∀ t₁ ∈ V(tree.1), ∀ t₂ ∈ V(tree.1),
+      v ∈ bag t₁ → v ∈ bag t₂ →
+      ∀ (p : { p : Walk γ δ t₁ t₂ // p.isPath }),
+        p.1.InGraph (tree.1 : Graph γ δ) →
+        ∀ t₃ ∈ p.1.support, v ∈ bag t₃
+
+/-- The **width** of a tree decomposition: max bag size minus one. -/
+noncomputable def TreeDecomp.width
+    {α β γ δ : Type*} [DecidableEq α] [DecidableEq β] [DecidableEq γ] [DecidableEq δ]
+    {G : SimpleGraph α β} (td : TreeDecomp α β G γ δ) : ℕ :=
+  sSup { n : ℕ | ∃ t ∈ V(td.tree.1), (td.bag t).card = n + 1 }
+
+/-- `tw(G)` — the **tree-width**: minimum width over all tree decompositions.
+    Uses `ℕ` rather than `WithTop ℕ` (convention: `tw(∅) = 0`). -/
+noncomputable def treeWidth (G : SimpleGraph α β) : ℕ :=
+  sInf { n : ℕ | ∃ (γ δ : Type) (_ : DecidableEq γ) (_ : DecidableEq δ)
+    (td : TreeDecomp α β G γ δ), td.width = n }
+
+scoped notation "tw(" G ")" => treeWidth G
+
+/-! ## Brambles -/
+
+/-- A **bramble** in `G` is a family of connected subgraphs that pairwise
+    **touch**: their vertex sets intersect, or there is an edge between them. -/
+def IsBramble (G : SimpleGraph α β) (B : Set (Set α)) : Prop :=
+  (∀ S ∈ B, S ⊆ V(G) ∧ S.Nonempty ∧ PreConnected (G[S] : Graph α β)) ∧
+  (∀ S ∈ B, ∀ T ∈ B,
+    (S ∩ T).Nonempty ∨ ∃ u ∈ S, ∃ v ∈ T, adj (G : Graph α β) u v)
+
+/-- A **hitting set** of a bramble: a vertex set that intersects every
+    bramble element. -/
+def IsHittingSet (B : Set (Set α)) (X : Finset α) : Prop :=
+  ∀ S ∈ B, ∃ v ∈ X, v ∈ S
+
+/-- The **order** of a bramble: the minimum size of a hitting set. -/
+noncomputable def brambleOrder (G : SimpleGraph α β) (B : Set (Set α)) : ℕ :=
+  sInf { k : ℕ | ∃ X : Finset α, X.card = k ∧ IsHittingSet B X }
+
+/-- The **bramble number** of `G`: maximum order of a bramble in `G`. -/
+noncomputable def brambleNr (G : SimpleGraph α β) : ℕ :=
+  sSup { k : ℕ | ∃ B, IsBramble G B ∧ brambleOrder G B = k }
+
+/-- **Seymour–Thomas duality**: `tw(G) + 1 = bramble number`. -/
+theorem treeWidth_bramble_duality (G : SimpleGraph α β) :
+    brambleNr G = tw(G) + 1 := sorry
+
+/-! ### Classical tree-width results -/
+
+/-- The tree-width of a tree is at most 1. -/
+theorem treeWidth_tree (G : SimpleGraph α β) (hG : isTree G) :
+    tw(G) ≤ 1 := by
+  sorry
+
+/-- The tree-width of a cycle is exactly 2. -/
+theorem treeWidth_cycle (G : SimpleGraph α β)
+    (hconn : PreConnected (G : Graph α β))
+    (hcyc : ∃ u ∈ V(G), ∃ (p : (u, u)-Walk-(α, β)), p.InGraph G ∧ p.isCycle ∧
+      ∀ v ∈ V(G), v ∈ p.support)
+    (hcard : VF((G : FinGraph α β)).card ≥ 3) :
+    tw(G) = 2 := by
+  sorry
+
+/-- The tree-width of a complete graph on `n` vertices is `n - 1`. -/
+theorem treeWidth_complete (G : SimpleGraph α β) (hG : IsComplete G) (n : ℕ)
+    (hn : VF((G : FinGraph α β)).card = n) (hn1 : n ≥ 1) :
+    tw(G) = n - 1 := by
+  sorry
+
+/-- Tree-width is monotone under subgraphs. -/
+theorem treeWidth_subgraph (G H : SimpleGraph α β)
+    (hsub : (H : Graph α β) ⊆ᴳ (G : Graph α β)) :
+    tw(H) ≤ tw(G) := by
+  sorry
+
+/-! ## Separations and tangles -/
+
+/-- A **separation** of `G` is a pair `(A, B)` with `A ∪ B = V(G)` and
+    no edge from `A \ B` to `B \ A`. -/
+structure Separation {α β : Type*} [DecidableEq α] [DecidableEq β]
+    (G : SimpleGraph α β) where
+  left : Finset α
+  right : Finset α
+  covers : (↑left : Set α) ∪ ↑right = V(G)
+  no_cross : ∀ e ∈ E(G), ∀ u ∈ e.endpoints, ∀ v ∈ e.endpoints,
+    u ∈ left → v ∈ right → u ∈ left ∩ right ∨ v ∈ left ∩ right
+
+/-- The **order** of a separation: `|A ∩ B|`. -/
+def Separation.order {α β : Type*} [DecidableEq α] [DecidableEq β]
+    {G : SimpleGraph α β} (s : Separation G) : ℕ :=
+  (s.left ∩ s.right).card
+
+/-- A **tangle of order `k`** in `G` orients every separation of order < `k`
+    consistently, pointing each one towards the "big side". -/
+structure Tangle {α β : Type*} [DecidableEq α] [DecidableEq β]
+    (G : SimpleGraph α β) (k : ℕ) where
+  /-- For each separation of order < k, `orient s` selects a side:
+      `true` means `s.left` is the small side. -/
+  orient : (s : Separation G) → s.order < k → Bool
+  /-- Totality: one side is always small. -/
+  total : ∀ (s : Separation G) (h : s.order < k),
+    orient s h = true ∨ orient s h = false
+  /-- Consistency: no three small sides cover `V(G)`. -/
+  consistent : ∀ (s₁ s₂ s₃ : Separation G)
+    (h₁ : s₁.order < k) (h₂ : s₂.order < k) (h₃ : s₃.order < k),
+    orient s₁ h₁ = true → orient s₂ h₂ = true → orient s₃ h₃ = true →
+    ¬((↑s₁.left : Set α) ∪ ↑s₂.left ∪ ↑s₃.left = V(G))
+  /-- No singleton is a small side. -/
+  no_singleton : ∀ (s : Separation G) (h : s.order < k),
+    orient s h = true → s.left.card > 1
+
+/-! ## Linkage -/
+
+/-- A **`k`-linkage** in `G` routes `k` terminal pairs via pairwise
+    internally vertex-disjoint paths. -/
+def IsLinkage {α β : Type*} [DecidableEq α] [DecidableEq β]
+    (G : SimpleGraph α β) (k : ℕ)
+    (terminals : Fin k → α × α)
+    (paths : (i : Fin k) →
+      ((terminals i).1, (terminals i).2)-Walk-(α, β)) : Prop :=
+  (∀ i, (paths i).InGraph (G : Graph α β)) ∧
+  (∀ i, (paths i).isPath) ∧
+  (∀ i j, i ≠ j → Disjoint
+    ((paths i).support.tail.dropLast.toFinset : Finset α)
+    ((paths j).support.tail.dropLast.toFinset))
+
+/-- `G` is **`k`-linked** if every set of `k` disjoint terminal pairs can
+    be linked by internally vertex-disjoint paths. -/
+def IsKLinked (G : SimpleGraph α β) (k : ℕ) : Prop :=
+  ∀ terminals : Fin k → α × α,
+    (∀ i, (terminals i).1 ∈ V(G) ∧ (terminals i).2 ∈ V(G)) →
+    (∀ i, (terminals i).1 ≠ (terminals i).2) →
+    (Function.Injective (fun i => (terminals i).1)) →
+    (Function.Injective (fun i => (terminals i).2)) →
+    (∀ i j, (terminals i).1 ≠ (terminals j).2) →
+    ∃ paths, IsLinkage G k terminals paths
+
+end Set.graphOn_nonempty

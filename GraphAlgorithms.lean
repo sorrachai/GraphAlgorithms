@@ -1,1 +1,6 @@
-import GraphAlgorithms.Basic
+import GraphAlgorithms.UndirectedGraphs.Basic
+import GraphAlgorithms.Matchings.Basic
+import GraphAlgorithms.Coloring.Basic
+import GraphAlgorithms.Contractions.Basic
+import GraphAlgorithms.Cuts.Basic
+import GraphAlgorithms.Embeddings.Basic
