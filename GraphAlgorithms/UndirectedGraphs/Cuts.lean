@@ -14,7 +14,7 @@ set_option tactic.hygienic false
 
 variable {α : Type*} [DecidableEq α]
 
-open SimpleGraphs
+open SimpleGraph
 
 def Cut (G : SimpleGraph α) (U : Finset α) :
   Finset (Edge α) := {e ∈ E(G) | ∃ u ∈ U, u ∈ e ∧ ∃ v ∈ V(G) \ U, v ∈ e}
