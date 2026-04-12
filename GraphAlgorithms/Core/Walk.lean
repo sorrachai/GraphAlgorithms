@@ -226,10 +226,11 @@ lemma is_walk_two_seqs_append_of (w1 w2 : VertexSeq α)
     IsWalk (w1.append w2) := by
   fun_induction w1.append w2 <;> grind
 
+@[grind ←]
 theorem is_walk_singleton_append_of (p : VertexSeq α) (v : α) (h : IsWalk p) (h2 : p.head ≠ v) :
   IsWalk ((VertexSeq.singleton v).append p) := by grind
 
-@[grind →]
+@[grind →, grind ←]
 lemma isWalk_rev_if (w : VertexSeq α) : IsWalk w → IsWalk w.reverse := by
   intro h
   induction h
