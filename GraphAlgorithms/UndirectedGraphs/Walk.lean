@@ -20,8 +20,8 @@ lemma prepend_iswalk_in (G : SimpleGraph α) (w : Walk α)
     (hw : IsWalkIn G w) (u : α)
     (hneq : u ≠ w.seq.head) (hedg : s(u, w.seq.head) ∈ E(G)) :
     IsWalkIn G
-      ⟨VertexSeq.append (VertexSeq.singleton u) w.seq,
-        prepend_iswalk w.seq u w.valid hneq⟩ := by
+      ⟨VertexSeq.append (VertexSeq.singleton u) w.seq, prepend_iswalk
+        w.seq u w.valid (Ne.intro (id (Ne.symm hneq)))⟩ := by
   suffices ∀ (p : VertexSeq α), IsWalkIn_VertexSeq G p →
       u ≠ p.head → s(u, p.head) ∈ E(G) →
       IsWalkIn_VertexSeq G ((VertexSeq.singleton u).append p) by
@@ -204,6 +204,9 @@ inductive IsVertexSeqIn (G : SimpleGraph α) : VertexSeq α → Prop
       (hw : IsVertexSeqIn G w)
       (he : s(w.tail, u) ∈ E(G)) :
       IsVertexSeqIn G (.cons w u)
+
+-- grind_pattern IsVertexSeqIn.singleton => IsVertexSeqIn G (.singleton v)
+-- grind_pattern IsVertexSeqIn.cons => IsVertexSeqIn G (.cons w u)
 
 abbrev VertexSeq.vertex_seq_in (w : VertexSeq α) (G : SimpleGraph α) := IsVertexSeqIn G w
 
