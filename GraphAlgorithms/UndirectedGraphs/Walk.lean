@@ -1,29 +1,29 @@
-import MyLean.GraphAlgorithms.Core.Walk
-import MyLean.GraphAlgorithms.UndirectedGraphs.SimpleGraphs
+import GraphAlgorithms.Core.Walk
+import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
 import Lean.LibrarySuggestions.Default
 
 -- Authors: Sorrachai Yingchareonthawornchai and Weixuan Yuan
 variable {α : Type*}
-
+open scoped SimpleGraph
 namespace Walk
 
 set_option tactic.hygienic false
 
 def IsWalkIn_VertexSeq (G : SimpleGraph α) : VertexSeq α → Prop
-  | .singleton v => v ∈ G.vertexSet
-  | .cons w u    => IsWalkIn_VertexSeq G w ∧ s(w.tail, u) ∈ G.edgeSet
+  | .singleton v => v ∈ V(G)
+  | .cons w u    => IsWalkIn_VertexSeq G w ∧ s(w.tail, u) ∈ E(G)
 
 def IsWalkIn (G : SimpleGraph α) (w : Walk α) : Prop :=
   IsWalkIn_VertexSeq G w.seq
 
 lemma prepend_iswalk_in (G : SimpleGraph α) (w : Walk α)
     (hw : IsWalkIn G w) (u : α)
-    (hneq : u ≠ w.seq.head) (hedg : s(u, w.seq.head) ∈ G.edgeSet) :
+    (hneq : u ≠ w.seq.head) (hedg : s(u, w.seq.head) ∈ E(G)) :
     IsWalkIn G
       ⟨VertexSeq.append (VertexSeq.singleton u) w.seq,
         prepend_iswalk w.seq u w.valid hneq⟩ := by
   suffices ∀ (p : VertexSeq α), IsWalkIn_VertexSeq G p →
-      u ≠ p.head → s(u, p.head) ∈ G.edgeSet →
+      u ≠ p.head → s(u, p.head) ∈ E(G) →
       IsWalkIn_VertexSeq G ((VertexSeq.singleton u).append p) by
     simpa [IsWalkIn] using this w.seq hw hneq hedg
   intro p; induction p with
@@ -59,7 +59,7 @@ lemma dropTail_iswalk_in (G : SimpleGraph α) (w : Walk α)
 
 lemma last_edge_mem (G : SimpleGraph α) (w : Walk α)
     (hw : IsWalkIn G w) (hlen : w.length ≠ 0) :
-    s(w.dropTail.tail, w.tail) ∈ G.edgeSet := by
+    s(w.dropTail.tail, w.tail) ∈ E(G) := by
   cases w with | mk seq valid =>
   cases valid with
   | singleton _ => simp [length] at hlen
@@ -69,7 +69,7 @@ lemma isWalkIn_VertexSeq_append (G : SimpleGraph α)
     (p q : VertexSeq α)
     (hp : IsWalkIn_VertexSeq G p)
     (hq : IsWalkIn_VertexSeq G q)
-    (hconn : s(p.tail, q.head) ∈ G.edgeSet) :
+    (hconn : s(p.tail, q.head) ∈ E(G)) :
     IsWalkIn_VertexSeq G (p.append q) := by
   induction q generalizing p hp with
   | singleton v => simpa [VertexSeq.append, IsWalkIn_VertexSeq] using ⟨hp, hconn⟩
@@ -80,7 +80,7 @@ lemma two_seqs_append_iswalk_in (G : SimpleGraph α)
     (w1 w2 : Walk α)
     (h1 : IsWalkIn G w1) (h2 : IsWalkIn G w2)
     (hneq : w1.tail ≠ w2.head)
-    (hedg : s(w1.tail, w2.head) ∈ G.edgeSet) :
+    (hedg : s(w1.tail, w2.head) ∈ E(G)) :
     IsWalkIn G ⟨w1.seq.append w2.seq, two_seqs_append_of w1 w2 hneq⟩ := by
   simpa [IsWalkIn] using isWalkIn_VertexSeq_append G w1.seq w2.seq h1 h2 hedg
 
@@ -154,9 +154,10 @@ lemma toPath_iswalk_in [DecidableEq α] (G : SimpleGraph α) (w : Walk α)
         simpa [Walk.toPath, VertexSeq.loopErase, hmem, IsWalkIn, IsWalkIn_VertexSeq] using
           ⟨hw0P, by simpa [Walk.tail_toPath] using hedg⟩
 
-end Walk
 
-namespace SimpleGraphs
+--namespace SimpleGraph
+open scoped SimpleGraph
+
 
 /-- `u` can reach `v` in `G` iff there exists a walk in `G` from `u` to `v`. -/
 def Reachable (G : SimpleGraph α) (u v : α) : Prop :=
@@ -164,13 +165,13 @@ def Reachable (G : SimpleGraph α) (u v : α) : Prop :=
 
 /-- `G` is connected iff every two vertices in `vertexSet` are reachable. -/
 def Connected (G : SimpleGraph α) : Prop :=
-  ∀ u v : α, u ∈ G.vertexSet → v ∈ G.vertexSet → Reachable G u v
+  ∀ u v : α, u ∈ V(G) → v ∈ V(G) → Reachable G u v
 
 /-- `G` is acyclic iff it contains no simple cycle. -/
 def Acyclic (G : SimpleGraph α) : Prop :=
   ¬ ∃ w : Walk α, Walk.IsWalkIn G w ∧ Walk.IsCycle w
 
-theorem reachable_refl (G : SimpleGraph α) (v : α) (hv : v ∈ G.vertexSet) :
+theorem reachable_refl (G : SimpleGraph α) (v : α) (hv : v ∈ V(G)) :
     Reachable G v v := by
   use ⟨VertexSeq.singleton v, IsWalk.singleton v⟩
   refine ⟨?_, rfl, rfl⟩
@@ -194,4 +195,53 @@ theorem reachable_trans (G : SimpleGraph α) (u v w : α)
   · grind [Walk.head_on_head]
   · grind [Walk.tail_on_tail]
 
-end SimpleGraphs
+-- Replicate the proof using inductive types
+namespace experimental
+
+inductive IsVertexSeqIn (G : SimpleGraph α) : VertexSeq α → Prop
+  | singleton (v : α) (hv : v ∈ V(G)) : IsVertexSeqIn G (.singleton v)
+  | cons (w : VertexSeq α) (u : α)
+      (hw : IsVertexSeqIn G w)
+      (he : s(w.tail, u) ∈ E(G)) :
+      IsVertexSeqIn G (.cons w u)
+
+abbrev VertexSeq.vertex_seq_in (w : VertexSeq α) (G : SimpleGraph α) := IsVertexSeqIn G w
+
+open Walk experimental
+
+@[grind →]
+lemma prepend_vertex_seq_in (G : SimpleGraph α) (w : VertexSeq α)
+    (hw : w.vertex_seq_in G) (u : α)
+    (hedg : s(u, w.head) ∈ E(G)) :
+    ((VertexSeq.singleton u).append w).vertex_seq_in G
+       := by
+    induction hw
+    · simp_all only [singleton_head_eq_self]
+      refine IsVertexSeqIn.cons (VertexSeq.singleton u) v ?_ hedg
+      refine IsVertexSeqIn.singleton u ?_
+      have:= G.incidence
+      aesop
+    · simp_all only [VertexSeq.con_head_eq, forall_const]
+      refine IsVertexSeqIn.cons ((VertexSeq.singleton u).append w_1) u_1 hw_ih ?_
+      grind
+
+lemma prepend_walk_valid (G : SimpleGraph α) (w : VertexSeq α)
+    (hw : w.vertex_seq_in G ∧ IsWalk w) (u : α)
+    (hedg : s(u, w.head) ∈ E(G)) :
+    let w' := (VertexSeq.singleton u).append w
+    w'.vertex_seq_in G ∧ IsWalk w' := by grind
+
+@[grind →]
+lemma reverse_iswalk_in (G : SimpleGraph α) (w : VertexSeq α) (hw : IsVertexSeqIn G w) :
+    IsVertexSeqIn G w.reverse := by
+    induction hw
+    · exact IsVertexSeqIn.singleton v hv
+    · apply prepend_vertex_seq_in G w_1.reverse hw_ih u
+      grind
+
+lemma reverse_walk_valid (G : SimpleGraph α) (w : VertexSeq α)
+  (hw : (w.vertex_seq_in G) ∧ IsWalk w) :
+    (w.reverse.vertex_seq_in G) ∧ IsWalk w.reverse := by grind
+
+end experimental
+end Walk

@@ -5,10 +5,12 @@ import Mathlib.Data.Sym.Sym2
 set_option tactic.hygienic false
 variable {α : Type*}
 
+
 /- VertexSeq as a non-empty seq -/
 inductive VertexSeq (α : Type*)
   | singleton (v : α) : VertexSeq α
   | cons (w : VertexSeq α) (v : α) : VertexSeq α
+
 
 namespace VertexSeq
 
@@ -32,10 +34,15 @@ def tail : VertexSeq α → α
   | .singleton v => v
   | .cons _ v => v
 
-@[simp] lemma con_head_eq (w : VertexSeq α) (u : α) :
+@[simp, grind =] lemma singleton_head_eq (u : α) :
+  (VertexSeq.singleton u).head = u := by simp [head]
+@[simp, grind =] lemma singleton_tail_eq (u : α) :
+  (VertexSeq.singleton u).tail = u := by simp [tail]
+
+@[simp, grind =] lemma con_head_eq (w : VertexSeq α) (u : α) :
     (w.cons u).head = w.head := rfl
 
-@[simp] lemma con_tail_eq (w : VertexSeq α) (u : α) :
+@[simp, grind =] lemma con_tail_eq (w : VertexSeq α) (u : α) :
     (w.cons u).tail = u := rfl
 
 /-! ## dropHead, dropTail -/
@@ -59,43 +66,57 @@ def reverse : VertexSeq α → VertexSeq α
   | .singleton v => .singleton v
   | .cons w v => append (.singleton v) (reverse w)
 
-@[simp] lemma tail_on_tail (p q : VertexSeq α) : (p.append q).tail = q.tail := by
+@[simp, grind =] lemma tail_on_tail (p q : VertexSeq α) : (p.append q).tail = q.tail := by
   fun_induction append <;> simp_all [tail]
 
-@[simp] lemma head_on_head (p q : VertexSeq α) : (p.append q).head = p.head := by
+@[simp, grind =] lemma head_on_head (p q : VertexSeq α) : (p.append q).head = p.head := by
   fun_induction append <;> simp_all
 
-@[simp] lemma tail_on_tail_singleton (p : VertexSeq α) (x : α) :
+@[simp, grind =] lemma tail_on_tail_singleton (p : VertexSeq α) (x : α) :
     (p.append (.singleton x)).tail = x := by
   unfold append
   unfold tail
   split <;> aesop
 
-@[simp] lemma head_on_head_singleton (p : VertexSeq α) (x : α) :
+@[simp, grind =] lemma head_on_head_singleton (p : VertexSeq α) (x : α) :
   ((VertexSeq.singleton x).append p).head = x := by
   unfold append
   unfold head
   split <;> aesop
 
-@[simp] lemma append_assoc (p q r : VertexSeq α) :
+@[simp, grind =] lemma append_assoc (p q r : VertexSeq α) :
     (p.append q).append r = p.append (q.append r) := by
   fun_induction append q r <;> simp_all [append]
 
-@[simp] lemma reverse_append (p q : VertexSeq α) :
+@[simp, grind =] lemma reverse_append (p q : VertexSeq α) :
     (p.append q).reverse = q.reverse.append p.reverse := by
   fun_induction append <;> simp_all [reverse]
 
-@[simp] lemma reverse_reverse (p : VertexSeq α) : (p.reverse).reverse = p := by
+
+@[simp, grind =] lemma reverse_reverse (p : VertexSeq α) : (p.reverse).reverse = p := by
   fun_induction reverse p <;> aesop
 
-@[simp] lemma head_reverse (p : VertexSeq α) : (p.reverse).head = p.tail := by
+grind_pattern reverse_reverse => (p.reverse).reverse
+
+
+@[simp, grind =] lemma head_reverse (p : VertexSeq α) : (p.reverse).head = p.tail := by
   fun_induction reverse p <;> aesop
 
-@[simp] lemma tail_reverse (p : VertexSeq α) : (p.reverse).tail = p.head := by
+grind_pattern head_reverse => (p.reverse).head
+
+
+
+@[simp, grind =] lemma tail_reverse (p : VertexSeq α) : (p.reverse).tail = p.head := by
   fun_induction reverse p <;> aesop
 
-@[simp] lemma dropTail_head (p : VertexSeq α) : p.dropTail.head = p.head := by
+grind_pattern tail_reverse => (p.reverse).tail
+
+
+@[simp, grind =] lemma dropTail_head (p : VertexSeq α) : p.dropTail.head = p.head := by
   fun_induction reverse p <;> aesop
+
+grind_pattern dropTail_head => p.dropTail.head
+
 
 /-! ## takeUntil, dropUntil, loopErase -/
 
@@ -177,6 +198,9 @@ inductive IsWalk : VertexSeq α → Prop
       (hneq : w.tail ≠ u)
     : IsWalk (.cons w u)
 
+grind_pattern IsWalk.singleton => IsWalk (.singleton v)
+grind_pattern IsWalk.cons => IsWalk (.cons w u)
+
 structure Walk (α : Type*) where
   seq : VertexSeq α
   valid : IsWalk seq
@@ -186,21 +210,52 @@ open VertexSeq
 
 /-! ## Basic IsWalk helper lemmas -/
 
-@[simp] lemma iswalk_prefix (w2 : VertexSeq α) (v : α)
+@[simp, grind =>] lemma iswalk_prefix (w2 : VertexSeq α) (v : α)
     (valid : IsWalk (w2.cons v)) : IsWalk w2 := by
   cases valid
   grind
 
-@[simp] lemma tail_neq_of_iswalk (w2 : VertexSeq α) (v : α)
+@[simp, grind <=] lemma tail_neq_of_iswalk (w2 : VertexSeq α) (v : α)
     (valid : IsWalk (w2.cons v)) : w2.tail ≠ v := by
   cases valid
   grind
+
+@[grind ←]
+lemma is_walk_two_seqs_append_of (w1 w2 : VertexSeq α)
+  (h1 : IsWalk w1) (h2 : IsWalk w2) (hneq : w1.tail ≠ w2.head) :
+    IsWalk (w1.append w2) := by
+  fun_induction w1.append w2 <;> grind
+
+theorem is_walk_singleton_append_of (p : VertexSeq α) (v : α) (h : IsWalk p) (h2 : p.head ≠ v) :
+  IsWalk ((VertexSeq.singleton v).append p) := by grind
+
+@[grind →]
+lemma isWalk_rev_if (w : VertexSeq α) : IsWalk w → IsWalk w.reverse := by
+  intro h
+  induction h
+  · simp only [reverse]
+    exact IsWalk.singleton v
+  · simp only [reverse]
+    refine is_walk_singleton_append_of w_1.reverse u hw_ih ?_
+    simpa only [head_reverse, ne_eq]
+
+@[grind →]
+theorem is_walk_neq_of_append (p q : VertexSeq α) (h : IsWalk (p.append q))
+  : IsWalk p ∧ IsWalk q ∧ p.tail ≠ q.head := by fun_induction append <;> grind
+
+@[grind →]
+lemma isWalk_rev_imp (w : VertexSeq α) : IsWalk w.reverse → IsWalk w := by
+  fun_induction reverse <;> grind
+
+@[simp, grind =]
+lemma isWalk_rev_iff (w : VertexSeq α) : IsWalk w.reverse ↔ IsWalk w := by grind
 
 lemma nodup_iswalk (w : VertexSeq α) (h : w.toList.Nodup) : IsWalk w := by
   induction w with
   | singleton v => simp [IsWalk.singleton]
   | cons w v ih => grind [IsWalk.cons, toList, tail, VertexSeq]
 
+@[grind ←]
 lemma prepend_iswalk (w2 : VertexSeq α) (v : α)
     (valid : IsWalk w2) (hneq : v ≠ w2.head) :
   IsWalk ((VertexSeq.singleton v).append w2) := by
@@ -314,6 +369,11 @@ def reverse (w : Walk α) : Walk α :=
     (Walk.append w1 w2 h).tail = w2.tail := by
   unfold Walk.append
   split <;> simp [Walk.tail]
+
+
+@[simp, grind =] theorem singleton_head_eq_self (v : α) : (VertexSeq.singleton v).head = v := by rfl
+@[simp, grind =] theorem singleton_tail_eq_self (v : α) : (VertexSeq.singleton v).tail = v := by rfl
+
 
 /-! ## path, cycle -/
 
