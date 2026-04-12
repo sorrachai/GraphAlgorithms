@@ -212,21 +212,16 @@ abbrev VertexSeq.vertex_seq_in (w : VertexSeq α) (G : SimpleGraph α) := IsVert
 
 open Walk experimental
 
+attribute [grind .] SimpleGraph.incidence
+
 @[grind ←]
 lemma prepend_vertex_seq_in (G : SimpleGraph α) (w : VertexSeq α)
-    (hw : w.vertex_seq_in G) (u : α)
-    (hedg : s(u, w.head) ∈ E(G)) :
-    ((VertexSeq.singleton u).append w).vertex_seq_in G
-       := by
+    (hw : w.vertex_seq_in G) (u : α) (hedg : s(u, w.head) ∈ E(G)) :
+    ((VertexSeq.singleton u).append w).vertex_seq_in G := by
     induction hw
-    · simp_all only [singleton_head_eq_self]
-      refine IsVertexSeqIn.cons (VertexSeq.singleton u) v ?_ hedg
-      refine IsVertexSeqIn.singleton u ?_
-      have:= G.incidence
-      aesop
+    · apply IsVertexSeqIn.cons (VertexSeq.singleton u) v (by grind) hedg
     · simp_all only [VertexSeq.con_head_eq, forall_const]
-      refine IsVertexSeqIn.cons ((VertexSeq.singleton u).append w_1) u_1 hw_ih ?_
-      grind
+      apply IsVertexSeqIn.cons ((VertexSeq.singleton u).append w_1) u_1 hw_ih (by grind)
 
 lemma prepend_walk_valid (G : SimpleGraph α) (w : VertexSeq α)
     (hw : w.vertex_seq_in G ∧ IsWalk w) (u : α)
@@ -239,8 +234,7 @@ lemma reverse_iswalk_in (G : SimpleGraph α) (w : VertexSeq α) (hw : IsVertexSe
     IsVertexSeqIn G w.reverse := by
     induction hw
     · grind
-    · apply prepend_vertex_seq_in G w_1.reverse hw_ih u
-      grind
+    · apply prepend_vertex_seq_in G w_1.reverse hw_ih u (by grind)
 
 lemma reverse_walk_valid (G : SimpleGraph α) (w : VertexSeq α)
   (hw : (w.vertex_seq_in G) ∧ IsWalk w) :

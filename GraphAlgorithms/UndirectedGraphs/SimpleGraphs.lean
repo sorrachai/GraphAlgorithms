@@ -14,7 +14,11 @@ structure SimpleGraph (α : Type*) where
   incidence : ∀ e ∈ edgeSet, ∀ v ∈ e, v ∈ vertexSet
   loopless :  ∀ e ∈ edgeSet, ¬ e.IsDiag
 
+
+
 open Finset
+
+
 
 
 namespace SimpleGraph
