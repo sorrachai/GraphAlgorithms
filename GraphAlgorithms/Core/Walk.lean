@@ -19,10 +19,10 @@ namespace VertexSeq
 /-- The list of vertices visited by the walk, in order. -/
 def toList : VertexSeq α → List α
   | .singleton v => [v]
-  | .cons p v => p.toList ++ [v]
+  | .cons p v => p.toList.cons v
 
 /-- The first node does not count in the sequence. -/
-@[simp] def length : VertexSeq α → ℕ
+def length : VertexSeq α → ℕ
   | .singleton _ => 0
   | .cons w _ => 1 + w.length
 
@@ -96,26 +96,17 @@ def reverse : VertexSeq α → VertexSeq α
 @[simp, grind =] lemma reverse_reverse (p : VertexSeq α) : (p.reverse).reverse = p := by
   fun_induction reverse p <;> aesop
 
-grind_pattern reverse_reverse => (p.reverse).reverse
-
 
 @[simp, grind =] lemma head_reverse (p : VertexSeq α) : (p.reverse).head = p.tail := by
   fun_induction reverse p <;> aesop
-
-grind_pattern head_reverse => (p.reverse).head
-
 
 
 @[simp, grind =] lemma tail_reverse (p : VertexSeq α) : (p.reverse).tail = p.head := by
   fun_induction reverse p <;> aesop
 
-grind_pattern tail_reverse => (p.reverse).tail
-
-
 @[simp, grind =] lemma dropTail_head (p : VertexSeq α) : p.dropTail.head = p.head := by
   fun_induction reverse p <;> aesop
 
-grind_pattern dropTail_head => p.dropTail.head
 
 
 /-! ## takeUntil, dropUntil, loopErase -/
@@ -171,8 +162,8 @@ def loopErase [DecidableEq α] : VertexSeq α → VertexSeq α
         .cons (loopErase w) v
   termination_by p => p.length
   decreasing_by
-  · simp; grind [takeUntil_length_le]
-  · simp
+  · simp [length]; grind [takeUntil_length_le]
+  · simp [length]
 
 lemma mem_loopErase [DecidableEq α] (w : VertexSeq α) :
     ∀ {x : α}, x ∈ w.loopErase.toList → x ∈ w.toList := by
@@ -227,7 +218,7 @@ lemma is_walk_two_seqs_append_of (w1 w2 : VertexSeq α)
   fun_induction w1.append w2 <;> grind
 
 @[grind ←]
-theorem is_walk_singleton_append_of (p : VertexSeq α) (v : α) (h : IsWalk p) (h2 : p.head ≠ v) :
+theorem prepend_iswalk (p : VertexSeq α) (v : α) (h : IsWalk p) (h2 : p.head ≠ v) :
   IsWalk ((VertexSeq.singleton v).append p) := by grind
 
 @[grind →, grind ←]
@@ -237,7 +228,7 @@ lemma isWalk_rev_if (w : VertexSeq α) : IsWalk w → IsWalk w.reverse := by
   · simp only [reverse]
     exact IsWalk.singleton v
   · simp only [reverse]
-    refine is_walk_singleton_append_of w_1.reverse u hw_ih ?_
+    refine prepend_iswalk w_1.reverse u hw_ih ?_
     simpa only [head_reverse, ne_eq]
 
 @[grind →]
@@ -256,13 +247,13 @@ lemma nodup_iswalk (w : VertexSeq α) (h : w.toList.Nodup) : IsWalk w := by
   | singleton v => simp [IsWalk.singleton]
   | cons w v ih => grind [IsWalk.cons, toList, tail, VertexSeq]
 
-@[grind ←]
-lemma prepend_iswalk (w2 : VertexSeq α) (v : α)
-    (valid : IsWalk w2) (hneq : v ≠ w2.head) :
-  IsWalk ((VertexSeq.singleton v).append w2) := by
-  induction valid generalizing v with
-  | singleton x => grind [head, tail, append, IsWalk.singleton, IsWalk.cons]
-  | cons w u hw htail ih => grind [head, append, IsWalk.cons, tail_on_tail]
+-- @[grind ←]
+-- lemma prepend_iswalk' (w2 : VertexSeq α) (v : α)
+--     (valid : IsWalk w2) (hneq : v ≠ w2.head) :
+--   IsWalk ((VertexSeq.singleton v).append w2) := by
+--   induction valid generalizing v with
+--   | singleton x => grind [head, tail, append, IsWalk.singleton, IsWalk.cons]
+--   | cons w u hw htail ih => grind [head, append, IsWalk.cons, tail_on_tail]
 
 lemma takeUntil_iswalk [DecidableEq α] (w : VertexSeq α) (v : α) (h : v ∈ w.toList)
   (hw : IsWalk w) :
@@ -296,11 +287,13 @@ abbrev dropTail (w : Walk α) : Walk α :=
 def append_single (w : Walk α) (u : α) (h : u ≠ w.tail) : Walk α :=
   ⟨w.seq.cons u, .cons w.seq u w.valid (by aesop)⟩
 
+@[simp, grind =]
 lemma dropTail_head (w : Walk α) : w.dropTail.head = w.head := by
   cases w with
   | mk seq valid =>
       cases seq <;> simp [Walk.head, VertexSeq.dropTail, VertexSeq.head]
 
+@[grind ←]
 lemma len_zero_of_drop_tail_eq_tail (w : Walk α) (h : w.dropTail.tail = w.tail) :
     w.length = 0 := by
   cases w
@@ -308,68 +301,45 @@ lemma len_zero_of_drop_tail_eq_tail (w : Walk α) (h : w.dropTail.tail = w.tail)
   · exact Nat.eq_zero_of_add_eq_zero_left rfl
   · exact Nat.eq_zero_of_not_pos fun a ↦ hneq h
 
+@[grind ←]
 lemma head_eq_tail_of_length_zero (w : Walk α) (h : w.length = 0) : w.head = w.tail := by
   cases w with
   | mk seq valid =>
-      cases valid <;> simp_all [Walk.length, Walk.head, Walk.tail, VertexSeq.head, VertexSeq.tail]
+      cases valid <;> simp_all [VertexSeq.length,Walk.length, Walk.head, Walk.tail, VertexSeq.head]
+
 
 /-! ## Walk append, reverse and related lemmas -/
 
+@[grind ←]
 lemma two_seqs_append_of (w1 w2 : Walk α) (hneq : w1.tail ≠ w2.head) :
     IsWalk (w1.seq.append w2.seq) := by
-  cases w1
-  cases w2
+  cases w1; cases w2
   simp_all only [Walk.tail, Walk.head, ne_eq]
-  fun_induction seq.append seq_1
-  · exact IsWalk.cons w v valid hneq
-  · refine IsWalk.cons (w.append w2) v ?_ ?_
-    apply ih1 <;> simp_all only [forall_const, con_head_eq, not_false_eq_true]
-    · exact iswalk_prefix w2 v valid_1
-    · simp_all only [forall_const, con_head_eq, tail_on_tail, ne_eq,
-        tail_neq_of_iswalk, not_false_eq_true]
+  exact is_walk_two_seqs_append_of seq seq_1 valid valid_1 hneq
 
+@[grind =]
 def append (w1 w2 : Walk α) (h : w1.tail = w2.head) : Walk α :=
   if h1 : w1.length = 0 then w2
   else
     { seq := w1.dropTail.seq.append w2.seq
       valid := by
         apply two_seqs_append_of
-        rw [← h]
-        by_contra!
-        absurd h1
-        apply len_zero_of_drop_tail_eq_tail
-        exact this }
+        grind  }
 
+@[grind =]
 def reverse (w : Walk α) : Walk α :=
   { seq := w.seq.reverse
     valid := by
       cases w
-      induction valid
-      · grind [VertexSeq.reverse, IsWalk]
-      · simp_all only [VertexSeq.reverse]
-        have h : IsWalk (VertexSeq.singleton u) := by exact IsWalk.singleton u
-        apply two_seqs_append_of (⟨VertexSeq.singleton u, h⟩ : Walk α) (⟨w.reverse, hw_ih⟩ : Walk α)
-        simp_all only [Walk.head, Walk.tail]
-        unfold VertexSeq.tail
-        aesop }
+      induction valid <;> grind
+  }
 
-@[simp] lemma head_reverse (w : Walk α) : (w.reverse).head = w.tail := by
-  simp [reverse, head]
-
-@[simp] lemma tail_reverse (w : Walk α) : (w.reverse).tail = w.head := by
-  simp [reverse, tail]
-
-@[simp] lemma head_on_head (w1 w2 : Walk α) (h : w1.tail = w2.head) :
-    (Walk.append w1 w2 h).head = w1.head := by
-  unfold Walk.append
-  split
-  · grind [head_eq_tail_of_length_zero]
-  · simp [Walk.head]
-
-@[simp] lemma tail_on_tail (w1 w2 : Walk α) (h : w1.tail = w2.head) :
-    (Walk.append w1 w2 h).tail = w2.tail := by
-  unfold Walk.append
-  split <;> simp [Walk.tail]
+@[simp, grind =] lemma head_reverse (w : Walk α) : (w.reverse).head = w.tail := by grind
+@[simp, grind =] lemma tail_reverse (w : Walk α) : (w.reverse).tail = w.head := by grind
+@[simp, grind =] lemma head_on_head (w1 w2 : Walk α) (h : w1.tail = w2.head) :
+    (Walk.append w1 w2 h).head = w1.head := by grind
+@[simp, grind =] lemma tail_on_tail (w1 w2 : Walk α) (h : w1.tail = w2.head) :
+    (Walk.append w1 w2 h).tail = w2.tail := by grind
 
 
 @[simp, grind =] theorem singleton_head_eq_self (v : α) : (VertexSeq.singleton v).head = v := by rfl
