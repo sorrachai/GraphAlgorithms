@@ -66,6 +66,9 @@ def reverse : VertexSeq α → VertexSeq α
   | .singleton v => .singleton v
   | .cons w v => append (.singleton v) (reverse w)
 
+@[simp, grind =] lemma singleton_reverse_eq (v : α) :
+  (VertexSeq.singleton v).reverse = .singleton v := rfl
+
 @[simp, grind =] lemma tail_on_tail (p q : VertexSeq α) : (p.append q).tail = q.tail := by
   fun_induction append <;> simp_all [tail]
 

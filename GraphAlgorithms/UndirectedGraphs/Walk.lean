@@ -205,14 +205,14 @@ inductive IsVertexSeqIn (G : SimpleGraph α) : VertexSeq α → Prop
       (he : s(w.tail, u) ∈ E(G)) :
       IsVertexSeqIn G (.cons w u)
 
--- grind_pattern IsVertexSeqIn.singleton => IsVertexSeqIn G (.singleton v)
--- grind_pattern IsVertexSeqIn.cons => IsVertexSeqIn G (.cons w u)
+grind_pattern IsVertexSeqIn.singleton => IsVertexSeqIn G (.singleton v)
+grind_pattern IsVertexSeqIn.cons => IsVertexSeqIn G (.cons w u)
 
 abbrev VertexSeq.vertex_seq_in (w : VertexSeq α) (G : SimpleGraph α) := IsVertexSeqIn G w
 
 open Walk experimental
 
-@[grind →]
+@[grind ←]
 lemma prepend_vertex_seq_in (G : SimpleGraph α) (w : VertexSeq α)
     (hw : w.vertex_seq_in G) (u : α)
     (hedg : s(u, w.head) ∈ E(G)) :
@@ -238,7 +238,7 @@ lemma prepend_walk_valid (G : SimpleGraph α) (w : VertexSeq α)
 lemma reverse_iswalk_in (G : SimpleGraph α) (w : VertexSeq α) (hw : IsVertexSeqIn G w) :
     IsVertexSeqIn G w.reverse := by
     induction hw
-    · exact IsVertexSeqIn.singleton v hv
+    · grind
     · apply prepend_vertex_seq_in G w_1.reverse hw_ih u
       grind
 
