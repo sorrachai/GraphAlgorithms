@@ -14,9 +14,8 @@ inductive IsWalkIn {V : Type*} (G : SimpleDiGraph V) : Walk V → Prop
     : IsWalkIn G ⟨.singleton v, .singleton v⟩
   | cons (w : Walk V) (u : V)
       (hw   : IsWalkIn G w)
-      (hneq : w.seq.tail ≠ u)
-      (hedg : (w.seq.tail, u) ∈ G.edgeSet)
-    : IsWalkIn G ⟨w.seq.cons u, .cons w.seq u w.valid hneq⟩
+      (hedg : (w.tail, u) ∈ G.edgeSet)
+    : IsWalkIn G (w.append_single u (by have : ∀ e ∈ G.edgeSet, e.1 ≠ e.2 :=  G.loopless; grind))
 
 
 end Walk
