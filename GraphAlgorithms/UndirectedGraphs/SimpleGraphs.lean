@@ -1,5 +1,4 @@
 import Mathlib.Data.Sym.Sym2
-
 -- Undirected Graphs
 -- Authors: Sorrachai Yingchareonthawornchai
 
@@ -8,18 +7,13 @@ variable {α : Type*}
 
 abbrev Edge := Sym2
 
-structure SimpleGraph (α : Type*) where
+@[grind] structure SimpleGraph (α : Type*) where
   vertexSet : Finset α
   edgeSet   : Finset (Edge α)
   incidence : ∀ e ∈ edgeSet, ∀ v ∈ e, v ∈ vertexSet
   loopless :  ∀ e ∈ edgeSet, ¬ e.IsDiag
 
-
-
 open Finset
-
-
-
 
 namespace SimpleGraph
 
@@ -60,5 +54,10 @@ lemma ne_of_mem_edgeSet (G : SimpleGraph α) (u v : α) (h : s(u, v) ∈ E(G)) :
 @[grind ←]
 lemma edgeSet_sym (G : SimpleGraph α) (u v : α) (h : s(u, v) ∈ E(G)) :
   s(v, u) ∈ E(G) := by grind
+
+@[ext, grind →] lemma ext {G H : SimpleGraph α}
+    (hV : G.vertexSet = H.vertexSet)
+    (hE : G.edgeSet = H.edgeSet) :
+    G = H := by grind
 
 end SimpleGraph
