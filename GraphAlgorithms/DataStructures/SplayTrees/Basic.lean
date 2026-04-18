@@ -20,6 +20,62 @@ def rotateLeft : BinaryTree → BinaryTree
 inductive Rot
   | zigZig | zigZag | zagZag | zagZig | zig | zag
 
+/-
+Zig-Zig (Left-Left): rotate right on the left child (p) of the root (g),
+then rotate right on the left child (x) of the new root (p).
+      g               p               x
+     / \            /   \            / \
+    p   D    =>    x     g    =>    A   p
+   / \            / \   / \            / \
+  x   C          A   B C   D          B   g
+ / \                                     / \
+A   B                                   C   D
+
+Zig-Zag (Left-Right): rotate left on the right child (x) of the root of the left subtree (p),
+then rotate right on the left child (x) of the root (g).
+      g              g               x
+     / \            / \            /   \
+    p   D    =>    x   D    =>    p     g
+   / \            / \            / \   / \
+  A   x          p   C          A   B C   D
+     / \        / \
+    B   C      A   B
+
+Zag-Zag (Right-Right): rotate left on the right child (p) of the root (g),
+then rotate left on the right child (x) of the new root (p).
+      g               p               x
+     / \            /   \            / \
+    A   p    =>    g     x    =>    p   D
+       / \        / \   / \        / \
+      B   x      A   B C   D      g   C
+         / \                     / \
+        C   D                   A   B
+
+Zag-Zig (Right-Left): rotate right on the left child (x) of the root of the right subtree (p),
+then rotate left on the right child (x) of the root (g).
+      g              g               x
+     / \            / \            /   \
+    A   p    =>    A   x    =>    g     p
+       / \            / \        / \   / \
+      x   D          B   p      A   B C   D
+     / \                / \
+    B   C              C   D
+
+Zig (Left): rotate right on the left child (x) of the root (p).
+     p              x
+    / \            / \
+   x   C    =>    A   p
+  / \                / \
+ A   B              B   C
+
+Zag (Right): rotate left on the right child (x) of the root (p).
+     p              x
+    / \            / \
+   A   x    =>    p   C
+      / \        / \
+     B   C      A   B
+-/
+
 def rotate (s : BinaryTree) (rt : Rot) : BinaryTree :=
   match rt with
   | .zigZig => rotateRight (rotateRight s) -- Explicitly two steps
@@ -36,7 +92,7 @@ def rotate (s : BinaryTree) (rt : Rot) : BinaryTree :=
   | .zag => rotateLeft s
 
 -- 3. SPLAY IMPLEMENTATION
--- Note the checks for .empty on grandchildren to decide between ZigZig vs Zig.
+-- Note the checks for .empty on grandchildren to decide between ZigZig vs Zig and ZagZag vs Zag.
 
 def splay (t : BinaryTree) (q : ℕ) : BinaryTree :=
   match t with
@@ -67,7 +123,7 @@ def splay (t : BinaryTree) (q : ℕ) : BinaryTree :=
           rotate t .zig
     else -- q > k (Symmetric case)
       match r with
-      | .empty => t
+      | .empty => t -- q not found, current root is closest
       | .node rl rk rr =>
         if q < rk then
           match rl with
@@ -87,7 +143,6 @@ def splay (t : BinaryTree) (q : ℕ) : BinaryTree :=
           -- Target found at child (rk == q)
           rotate t .zag
 
-
 def subtree_rooted_at (t : BinaryTree) (q : ℕ) : BinaryTree :=
   match t with
   | .empty => .empty
@@ -98,8 +153,6 @@ def subtree_rooted_at (t : BinaryTree) (q : ℕ) : BinaryTree :=
       subtree_rooted_at l q
     else
       subtree_rooted_at r q
-
-
 
 -- 4. COST FUNCTION
 -- Exactly matches the logic above.
@@ -136,9 +189,6 @@ def splay.cost (t : BinaryTree) (q : ℕ) : ℝ :=
           | .empty => 1                 -- Zag (Grandchild empty)
           | _ => (splay.cost rr q) + 2  -- Zag-Zag
         else 1                          -- Zag (Found at child)
-
-
-
 
 theorem splay_cost_pos (q : ℕ) (t : BinaryTree) : 0 ≤ splay.cost t q := by
   fun_induction splay.cost <;> grind
@@ -294,39 +344,6 @@ lemma valid_rot_imp (s : BinaryTree) (rt : Rot) : valid_rot s rt →
   simp [valid_rot] at h
   split at h <;> simp_all [rotate,rotateRight,rotateLeft]
 
-/-
-Zig-Zig (Left-Left): rotate right twice
-      g              x
-     / \            / \
-    p   D    =>    A   p
-   / \                / \
-  x   C              B   g
- / \                    / \
-A   B                  C   D
--/
-
-/-
-Zag-Zag (Right-Right): rotate left twice
-  x                  z
- / \                / \
-A   y      =>      y   D
-   / \            / \
-  B   z          x   C
-     / \        / \
-    C   D      A   B
--/
-
-/-
-Zag-Zig (Right-Left): rotate right on right child, then rotate left
-  g                x
- / \              / \
-A   p      =>    g   p
-   / \          / \ / \
-  x   D        A  B C  D
- / \
-B   C
--/
-
 theorem pot_change_rotation (s : BinaryTree) (rt : Rot)
    : valid_rot s rt ->
   let result := rotate s rt
@@ -382,16 +399,6 @@ theorem pot_change_rotation (s : BinaryTree) (rt : Rot)
       _ ≤ r'p - rp + 2*r'x - 2*rx - 2 := by linarith
       _ ≤ 3 * (r'x - rx) - 2 := by linarith
   · -- zigZag
-/-
-Zag-Zig (Right-Left): rotate right on right child, then rotate left
-  g                x
- / \              / \
-A   p      =>    g   p
-   / \          / \ / \
-  x   D        A  B C  D
- / \
-B   C
--/
     apply valid_rot_imp at h;simp at h; obtain ⟨A,p,B,x,C,g,D,⟨hs,hs'⟩⟩ := h
     subst result
     rw [hs']
@@ -800,18 +807,6 @@ theorem splay_potential_change (t : BinaryTree) (q : ℕ) :
         simp only [rank, BinaryTree.num_nodes, num_nodes_splay, inter,
         original, t', t]
     dsimp
-
-   /-
-    Zig-Zag (Left-Right): rotate left on left child, then rotate right
-       k              y
-      / \            / \
-    (lk)   D  =>    x   z
-    /  \           / \ / \
-  [ll] [lr]       A  B C  D
-      / \
-     B   C
-    -/
-
     -- Step 1: restate the goal
     change φ result - φ original + cost ≤
       3 * rank (result) - 3 * rank (subtree_rooted_at original q)+ 1
@@ -1042,18 +1037,6 @@ theorem splay_potential_change (t : BinaryTree) (q : ℕ) :
         simp only [rank, BinaryTree.num_nodes, num_nodes_splay, inter,
         original, t', t]
     dsimp
-
-   /-
-    Zig-Zag (Left-Right): rotate left on left child, then rotate right
-       k              y
-      / \            / \
-    (lk)   D  =>    x   z
-    /  \           / \ / \
-  [ll] [lr]       A  B C  D
-      / \
-     B   C
-    -/
-
     -- Step 1: restate the goal
     change φ result - φ original + cost ≤
       3 * rank (result) - 3 * rank (subtree_rooted_at original q)+ 1

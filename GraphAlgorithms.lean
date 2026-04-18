@@ -1,1 +1,2 @@
 import GraphAlgorithms.DataStructures.SplayTrees.BinaryTree
+import GraphAlgorithms.DataStructures.SplayTrees.BottomUp

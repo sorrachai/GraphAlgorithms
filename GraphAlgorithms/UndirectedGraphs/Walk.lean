@@ -12,31 +12,57 @@ set_option linter.unusedSectionVars false
 
 open scoped SimpleGraph
 
-@[grind] inductive VertexSeq.IsVertexSeqIn (G : SimpleGraph α) : VertexSeq α → Prop
+namespace VertexSeq
+
+@[grind] inductive IsVertexSeqIn (G : SimpleGraph α) : VertexSeq α → Prop
   | singleton (v : α) (hv : v ∈ V(G)) : IsVertexSeqIn G (.singleton v)
   | cons (w : VertexSeq α) (u : α)
       (hw : IsVertexSeqIn G w)
       (he : s(w.tail, u) ∈ E(G)) :
       IsVertexSeqIn G (.cons w u)
 
-grind_pattern VertexSeq.IsVertexSeqIn.singleton => VertexSeq.IsVertexSeqIn G (.singleton v)
-grind_pattern VertexSeq.IsVertexSeqIn.cons => VertexSeq.IsVertexSeqIn G (.cons w u)
-
-abbrev VertexSeq.vertex_seq_in (w : VertexSeq α) (G : SimpleGraph α) := IsVertexSeqIn G w
-abbrev VertexSeq.edgeSet (w : VertexSeq α) : Finset (Edge α) :=
+abbrev vertex_seq_in (w : VertexSeq α) (G : SimpleGraph α) := IsVertexSeqIn G w
+abbrev edgeSet (w : VertexSeq α) : Finset (Edge α) :=
   match w with
   | .singleton _ => ∅
   | .cons w u => w.edgeSet ∪ {s(w.tail, u)}
 
-@[simp] lemma VertexSeq.is_vertex_seq_in_iff (G : SimpleGraph α) (p : VertexSeq α) :
+@[simp] lemma is_vertex_seq_in_iff (G : SimpleGraph α) (p : VertexSeq α) :
   IsVertexSeqIn G p ↔ p.head ∈ V(G) ∧ p.edgeSet ⊆ E(G) := by
   induction p <;> grind
 
+lemma takeUntil_edgeSet (w : VertexSeq α) (v : α)
+    (h : v ∈ w.toList) :
+    (w.takeUntil v h).edgeSet ⊆ w.edgeSet := by
+  induction w generalizing v
+  · intro a ha; simp [takeUntil] at ha
+  · by_cases h2 : v ∈ w_1.toList
+    · grind
+    · simp [takeUntil, h2]
+
+lemma loopErase_edgeSet (w : VertexSeq α) :
+    w.loopErase.edgeSet ⊆ w.edgeSet := by
+  suffices h : ∀ n : ℕ, ∀ w : VertexSeq α,
+      w.length = n → w.loopErase.edgeSet ⊆ w.edgeSet by grind
+  intro n; refine Nat.strong_induction_on n ?_
+  intro n ih w hlen; cases w
+  · intro a ha; simp [loopErase, edgeSet] at ha
+  · by_cases hmem : v ∈ w_1.toList
+    · grind [takeUntil_edgeSet, takeUntil_length_le]
+    · intro a ha
+      have ha' : a = s(w_1.loopErase.tail, v) ∨ a ∈ w_1.loopErase.edgeSet := by
+        simpa [loopErase, hmem] using ha
+      grind [tail_loopErase]
+
+end VertexSeq
 
 namespace Walk
 open VertexSeq
 
 abbrev edgeSet (w : Walk α) : Finset (Edge α) := w.seq.edgeSet
+
+lemma toPath_edgeSet (w : Walk α) : w.toPath.edgeSet ⊆ w.edgeSet := by
+  simpa [edgeSet] using loopErase_edgeSet w.seq
 
 lemma iswalk_in_iff (G : SimpleGraph α) (w : Walk α) :
   IsVertexSeqIn G w.seq ↔ w.head ∈ V(G) ∧ w.edgeSet ⊆ E(G) := by
@@ -115,7 +141,7 @@ lemma append_iswalk_in (G : SimpleGraph α)
     (w1 w2 : Walk α)
     (h1 : IsVertexSeqIn G w1.seq) (h2 : IsVertexSeqIn G w2.seq)
     (h : w1.tail = w2.head) :
-    IsVertexSeqIn G (Walk.append w1 w2 h).seq := by
+    IsVertexSeqIn G (append w1 w2 h).seq := by
     unfold append
     by_cases h1 : w1.length = 0
     · grind
@@ -137,14 +163,13 @@ lemma toPath_iswalk_in (G : SimpleGraph α) (w : Walk α)
         · let p : Walk α := ⟨w0.takeUntil u hmem, takeUntil_iswalk w0 u hmem hw0⟩
           have hp_in : IsVertexSeqIn G p.seq := by grind
           have hplt : p.length < n := by grind [VertexSeq.takeUntil_length_le]
-          simpa [Walk.toPath, VertexSeq.loopErase, hmem, p] using
+          simpa [toPath, VertexSeq.loopErase, hmem, p] using
             ih p.length hplt p rfl hp_in
         · have hw0P : IsVertexSeqIn G (⟨w0, hw0⟩ : Walk α).toPath.seq := by
             exact ih _ hw0lt (⟨w0, hw0⟩ : Walk α) rfl hw0_in
           have hcons : IsVertexSeqIn G ((⟨w0, hw0⟩ : Walk α).toPath.seq.cons u) := by
             refine IsVertexSeqIn.cons _ _ hw0P ?_
-            simpa [Walk.tail_toPath] using hedg
+            simpa [tail_toPath] using hedg
           grind
-
 
 end Walk
