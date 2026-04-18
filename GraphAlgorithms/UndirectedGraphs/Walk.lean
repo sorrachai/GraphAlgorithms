@@ -1,5 +1,5 @@
-import Mylean.GraphAlgorithms.Core.Walk
-import Mylean.GraphAlgorithms.UndirectedGraphs.SimpleGraphs
+import GraphAlgorithms.Core.Walk
+import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
 
 
 -- Authors: Sorrachai Yingchareonthawornchai and Weixuan Yuan
@@ -171,6 +171,5 @@ lemma toPath_iswalk_in (G : SimpleGraph α) (w : Walk α)
             refine IsVertexSeqIn.cons _ _ hw0P ?_
             simpa [tail_toPath] using hedg
           grind
-
 
 end Walk
