@@ -2334,6 +2334,447 @@ lemma subtree_rooted_at_splay'_off_path
               exact subtree_rooted_at_rotateLeft_nonpivot
                 l rl rr k rk x hk_lt_rk hx_ne_k hx_ne_rk
 
+/-- **Off-path descent invariance for the full `splay` wrapper.**
+
+Lifting `subtree_rooted_at_splay'_off_path` through the optional outer
+single-rotation performed by `splay` when the search-path length is even.
+The outer rotation's pivot is the root of the recursively-splayed child
+subtree, which by `splay'_root_in_searchPath` lies on `l.searchPath q`
+(or `r.searchPath q`); combined with `x ∉ t.searchPath q` and the
+inner IH, `subtree_rooted_at_rotate{Right,Left}_nonpivot` plus
+`subtree_rooted_at_replace_{left,right}` close the rotation step. -/
+lemma subtree_rooted_at_splay_off_path
+    (t : BinaryTree) (q x : ℕ)
+    (hBST : IsBST t) (hx : x ∉ t.searchPath q) :
+    subtree_rooted_at (splay t q) x = subtree_rooted_at t x := by
+  cases t with
+  | empty => rfl
+  | node l k r =>
+    -- Root k is always on `(.node l k r).searchPath q`, so `x ≠ k`.
+    have hk_in : k ∈ (BinaryTree.node l k r).searchPath q := by
+      unfold BinaryTree.searchPath
+      by_cases hqk : q = k
+      · rw [if_pos hqk]; simp
+      · rw [if_neg hqk]
+        by_cases hqlt : q < k
+        · rw [if_pos hqlt]; simp
+        · rw [if_neg hqlt]; simp
+    have hx_ne_k : x ≠ k := fun heq => hx (heq ▸ hk_in)
+    -- Split on parity of the search-path length.
+    by_cases hodd : Odd ((BinaryTree.node l k r).search_path_len q)
+    · -- Odd: `splay = splay'`.
+      show subtree_rooted_at
+          (if Odd ((BinaryTree.node l k r).search_path_len q)
+             then splay' (.node l k r) q
+             else _) x = _
+      rw [if_pos hodd]
+      exact subtree_rooted_at_splay'_off_path q (.node l k r) x hBST hx
+    · -- Not odd: `splay = ...` with an outer single rotation.
+      show subtree_rooted_at
+          (if Odd ((BinaryTree.node l k r).search_path_len q)
+             then splay' (.node l k r) q
+             else
+               if q = k then (BinaryTree.node l k r)
+               else if q < k then rotate (.node (splay' l q) k r) .zig
+               else rotate (.node l k (splay' r q)) .zag) x = _
+      rw [if_neg hodd]
+      by_cases hqk : q = k
+      · -- Degenerate: q = k forces len = 1, which is odd — impossible. Still
+        -- `splay = t` in this branch, so the goal is trivial.
+        rw [if_pos hqk]
+      · rw [if_neg hqk]
+        by_cases hqlt : q < k
+        · -- `q < k`: outer rotation is a `rotateRight` of `.node (splay' l q) k r`.
+          rw [if_pos hqlt]
+          show subtree_rooted_at (rotateRight (.node (splay' l q) k r)) x
+            = subtree_rooted_at (.node l k r) x
+          have hBSTl : IsBST l := by
+            cases hBST with | node _ _ _ _ _ hBl _ => exact hBl
+          have hForL : ForallTree (fun y => y < k) l := by
+            cases hBST with | node _ _ _ hfL _ _ _ => exact hfL
+          have hx_notin_l : x ∉ l.searchPath q := by
+            intro hmem; apply hx
+            show x ∈ (BinaryTree.node l k r).searchPath q
+            unfold BinaryTree.searchPath
+            rw [if_neg hqk, if_pos hqlt]
+            exact List.mem_cons.mpr (Or.inr hmem)
+          have ihA : subtree_rooted_at (splay' l q) x = subtree_rooted_at l x :=
+            subtree_rooted_at_splay'_off_path q l x hBSTl hx_notin_l
+          cases hA : splay' l q with
+          | empty =>
+            -- `rotateRight (.node .empty k r) = .node .empty k r`.
+            show subtree_rooted_at (.node .empty k r) x
+              = subtree_rooted_at (.node l k r) x
+            refine subtree_rooted_at_replace_left _ _ r k x hx_ne_k ?_
+            rw [hA] at ihA; exact ihA
+          | node a lk' b =>
+            -- `rotateRight (.node (.node a lk' b) k r) = .node a lk' (.node b k r)`.
+            show subtree_rooted_at (.node a lk' (.node b k r)) x
+              = subtree_rooted_at (.node l k r) x
+            have hlk'_in_path : lk' ∈ l.searchPath q :=
+              splay'_root_in_searchPath _ _ hA
+            have hlk'_in_keys : lk' ∈ l.toKeyList :=
+              searchPath_subset_toKeyList l q lk' hlk'_in_path
+            have hlk'_lt_k : lk' < k :=
+              ForallTree.forall_mem_toKeyList hForL lk' hlk'_in_keys
+            have hx_ne_lk' : x ≠ lk' := by
+              intro heq; apply hx_notin_l; subst heq; exact hlk'_in_path
+            rw [subtree_rooted_at_rotateRight_nonpivot a b r k lk' x
+              hlk'_lt_k hx_ne_lk' hx_ne_k]
+            refine subtree_rooted_at_replace_left _ _ r k x hx_ne_k ?_
+            rw [hA] at ihA; exact ihA
+        · -- `q > k`: outer rotation is a `rotateLeft` of `.node l k (splay' r q)`.
+          rw [if_neg hqlt]
+          show subtree_rooted_at (rotateLeft (.node l k (splay' r q))) x
+            = subtree_rooted_at (.node l k r) x
+          have hBSTr : IsBST r := by
+            cases hBST with | node _ _ _ _ _ _ hBr => exact hBr
+          have hForR : ForallTree (fun y => k < y) r := by
+            cases hBST with | node _ _ _ _ hfR _ _ => exact hfR
+          have hx_notin_r : x ∉ r.searchPath q := by
+            intro hmem; apply hx
+            show x ∈ (BinaryTree.node l k r).searchPath q
+            unfold BinaryTree.searchPath
+            rw [if_neg hqk, if_neg hqlt]
+            exact List.mem_cons.mpr (Or.inr hmem)
+          have ihA : subtree_rooted_at (splay' r q) x = subtree_rooted_at r x :=
+            subtree_rooted_at_splay'_off_path q r x hBSTr hx_notin_r
+          cases hA : splay' r q with
+          | empty =>
+            -- `rotateLeft (.node l k .empty) = .node l k .empty`.
+            show subtree_rooted_at (.node l k .empty) x
+              = subtree_rooted_at (.node l k r) x
+            refine subtree_rooted_at_replace_right l _ _ k x hx_ne_k ?_
+            rw [hA] at ihA; exact ihA
+          | node a rk' b =>
+            -- `rotateLeft (.node l k (.node a rk' b)) = .node (.node l k a) rk' b`.
+            show subtree_rooted_at (.node (.node l k a) rk' b) x
+              = subtree_rooted_at (.node l k r) x
+            have hrk'_in_path : rk' ∈ r.searchPath q :=
+              splay'_root_in_searchPath _ _ hA
+            have hrk'_in_keys : rk' ∈ r.toKeyList :=
+              searchPath_subset_toKeyList r q rk' hrk'_in_path
+            have hk_lt_rk' : k < rk' :=
+              ForallTree.forall_mem_toKeyList hForR rk' hrk'_in_keys
+            have hx_ne_rk' : x ≠ rk' := by
+              intro heq; apply hx_notin_r; subst heq; exact hrk'_in_path
+            rw [subtree_rooted_at_rotateLeft_nonpivot l a b k rk' x
+              hk_lt_rk' hx_ne_k hx_ne_rk']
+            refine subtree_rooted_at_replace_right l _ _ k x hx_ne_k ?_
+            rw [hA] at ihA; exact ihA
+
+/-- **`vVal` is preserved for off-path keys under `splay`.**
+
+Immediate consequence of `subtree_rooted_at_splay_off_path`: `gVal` and
+`hVal` read only from the subtree rooted at `x`, which is unchanged. -/
+lemma vVal_splay_off_path
+    (col : ColorState) (t : BinaryTree) (q x : ℕ)
+    (hBST : IsBST t) (hx : x ∉ t.searchPath q) :
+    vVal col (splay t q) x = vVal col t x := by
+  have hsub := subtree_rooted_at_splay_off_path t q x hBST hx
+  unfold vVal gVal hVal
+  rw [hsub]
+
+/-- **`paintYellow` leaves keys outside `xs` untouched.** -/
+lemma ColorState.paintYellow_eq_of_not_mem
+    (col : ColorState) (xs : List ℕ) (y : ℕ) (hy : y ∉ xs) :
+    (col.paintYellow xs) y = col y := by
+  induction xs generalizing col with
+  | nil => rfl
+  | cons a xs ih =>
+    have hya : y ≠ a := fun h => hy (h ▸ List.mem_cons_self)
+    have hy' : y ∉ xs := fun h => hy (List.mem_cons_of_mem _ h)
+    -- `paintYellow col (a :: xs)` reduces to `paintYellow (step col a) xs`.
+    change (List.foldl (fun c x => if c x = .uncolored then c.set x .yellow else c)
+        col (a :: xs)) y = col y
+    rw [List.foldl_cons]
+    -- Apply IH to the stepped color state.
+    set col' := (if col a = .uncolored then col.set a .yellow else col) with hcol'
+    have hih : (List.foldl (fun c x => if c x = .uncolored then c.set x .yellow else c)
+        col' xs) y = col' y := ih col' hy'
+    rw [hih]
+    -- `col' y = col y` since `y ≠ a`.
+    rw [hcol']
+    by_cases h : col a = .uncolored
+    · rw [if_pos h]; show (col.set a .yellow) y = col y
+      unfold ColorState.set; rw [if_neg hya]
+    · rw [if_neg h]
+
+/-- **`processLink` only touches the two endpoint colors.** -/
+lemma processLink_color_eq_of_ne
+    (col : ColorState) (cnt : LinkCounters) (t : BinaryTree) (w z y : ℕ)
+    (hyw : y ≠ w) (hyz : y ≠ z) :
+    (processLink col cnt t w z).1 y = col y := by
+  by_cases hY : col w = .yellow ∨ col z = .yellow
+  · rw [processLink_eq_Y _ _ _ _ _ hY]
+    -- The fst is a nested `if` over `col z = .yellow` / `col w = .yellow`.
+    show (if col z = .yellow
+            then (if col w = .yellow then col.set w .green else col).set z .green
+            else (if col w = .yellow then col.set w .green else col)) y = col y
+    by_cases hcz : col z = .yellow
+    · rw [if_pos hcz]
+      show ((if col w = .yellow then col.set w .green else col).set z .green) y = col y
+      rw [ColorState.set]; simp only [if_neg hyz]
+      by_cases hcw : col w = .yellow
+      · rw [if_pos hcw]; show (col.set w .green) y = col y
+        unfold ColorState.set; rw [if_neg hyw]
+      · rw [if_neg hcw]
+    · rw [if_neg hcz]
+      by_cases hcw : col w = .yellow
+      · rw [if_pos hcw]; show (col.set w .green) y = col y
+        unfold ColorState.set; rw [if_neg hyw]
+      · rw [if_neg hcw]
+  · by_cases hA : vVal col t z = 1
+    · rw [processLink_eq_A _ _ _ _ _ hY hA]
+    · rw [processLink_eq_B _ _ _ _ _ hY hA]
+
+/-- **`processLinks` fixes every key that is not an endpoint of any link.** -/
+lemma processLinks_color_eq_of_ne
+    (col : ColorState) (cnt : LinkCounters) (t : BinaryTree)
+    (links : List (ℕ × ℕ)) (y : ℕ)
+    (hy : ∀ wz ∈ links, y ≠ wz.1 ∧ y ≠ wz.2) :
+    (processLinks col cnt t links).1 y = col y := by
+  induction links generalizing col cnt with
+  | nil => rfl
+  | cons wz rest ih =>
+    have hhd := hy wz List.mem_cons_self
+    have htl : ∀ wz' ∈ rest, y ≠ wz'.1 ∧ y ≠ wz'.2 :=
+      fun wz' h => hy wz' (List.mem_cons_of_mem _ h)
+    show (processLinks (processLink col cnt t wz.1 wz.2).1
+            (processLink col cnt t wz.1 wz.2).2 t rest).1 y = col y
+    rw [ih _ _ htl, processLink_color_eq_of_ne _ _ _ _ _ _ hhd.1 hhd.2]
+
+/-- **`stepColor` fixes every key outside the search path.**
+
+All color changes inside `stepColor` are either `paintYellow` on
+`path.tail` or `processLink` endpoints (which lie in `linksOfSpine path`
+and hence in `path`). -/
+lemma stepColor_color_eq_of_not_mem_searchPath
+    (col : ColorState) (t t' : BinaryTree) (q y : ℕ)
+    (hy : y ∉ t.searchPath q) :
+    (stepColor col t t' q).1 y = col y := by
+  dsimp only [stepColor]
+  set path := t.searchPath q with hpath
+  have hy_tail : y ∉ path.tail := fun h => hy (List.mem_of_mem_tail h)
+  have hy_col₁ : (col.paintYellow path.tail) y = col y :=
+    ColorState.paintYellow_eq_of_not_mem col _ y hy_tail
+  rcases hls : linksOfSpine path with _ | ⟨_top, rest⟩
+  · -- No spine links: result is just `paintYellow`.
+    show (col.paintYellow path.tail) y = col y
+    exact hy_col₁
+  · -- Spine links present: apply `processLinks` off-path preservation.
+    have hlinks_ne : ∀ wz ∈ rest, y ≠ wz.1 ∧ y ≠ wz.2 := by
+      intro wz hwz
+      have hmem : wz ∈ linksOfSpine path := by
+        rw [hls]; exact List.mem_cons_of_mem _ hwz
+      have := linksOfSpine_fst_mem _ wz hmem
+      exact ⟨fun h => hy (h ▸ this.1), fun h => hy (h ▸ this.2)⟩
+    show (processLinks (col.paintYellow path.tail) 0 t rest).1 y = col y
+    rw [processLinks_color_eq_of_ne _ _ _ _ _ hlinks_ne, hy_col₁]
+
+/-- Every key on the right spine of a tree is a key of the tree. -/
+lemma BinaryTree.rightSpineKeys_subset_toKeyList :
+    ∀ (t : BinaryTree), ∀ k ∈ t.rightSpineKeys, k ∈ t.toKeyList
+  | .empty, k, hk => by simp [BinaryTree.rightSpineKeys] at hk
+  | .node l a r, k, hk => by
+    simp only [BinaryTree.rightSpineKeys, List.mem_cons] at hk
+    simp only [BinaryTree.toKeyList, List.mem_append, List.mem_singleton]
+    rcases hk with rfl | hkr
+    · exact Or.inl (Or.inr rfl)
+    · exact Or.inr (BinaryTree.rightSpineKeys_subset_toKeyList r k hkr)
+
+/-- The keys of a `subtree_rooted_at` descent are a subset of the tree's keys. -/
+lemma subtree_rooted_at_toKeyList_subset :
+    ∀ (t : BinaryTree) (x : ℕ), ∀ k ∈ (subtree_rooted_at t x).toKeyList, k ∈ t.toKeyList
+  | .empty, x, k, hk => by simp [subtree_rooted_at, BinaryTree.toKeyList] at hk
+  | .node l a r, x, k, hk => by
+    unfold subtree_rooted_at at hk
+    split_ifs at hk with h1 h2
+    · -- x = a: subtree is the whole tree.
+      exact hk
+    · -- x < a: subtree is in `l`.
+      have := subtree_rooted_at_toKeyList_subset l x k hk
+      simp only [BinaryTree.toKeyList, List.mem_append]
+      exact Or.inl (Or.inl this)
+    · -- x > a: subtree is in `r`.
+      have := subtree_rooted_at_toKeyList_subset r x k hk
+      simp only [BinaryTree.toKeyList, List.mem_append]
+      exact Or.inr this
+
+/-- **BST off-path disjointness.**  In a BST `t`, if `z ∉ t.searchPath q`,
+every key inside the `subtree_rooted_at t z` descent is also off-path.
+
+Intuition: in a BST the search paths for `z` and `q` follow the same
+chain of nodes until they diverge at some ancestor.  After divergence,
+`z`'s descent enters a subtree strictly separated (by BST ordering) from
+the continuation of `q`'s path. -/
+lemma IsBST.searchPath_subtree_disjoint :
+    ∀ {t : BinaryTree}, IsBST t → ∀ (q z : ℕ), z ∉ t.searchPath q →
+      ∀ k ∈ (subtree_rooted_at t z).toKeyList, k ∉ t.searchPath q
+  | .empty, _, _, _, _, k, hk => by
+    simp [subtree_rooted_at, BinaryTree.toKeyList] at hk
+  | .node l a r, hBST, q, z, hz, k, hk => by
+    have hFL : ForallTree (fun y => y < a) l := by
+      cases hBST with | node _ _ _ hfL _ _ _ => exact hfL
+    have hFR : ForallTree (fun y => a < y) r := by
+      cases hBST with | node _ _ _ _ hfR _ _ => exact hfR
+    have hBSTl : IsBST l := by
+      cases hBST with | node _ _ _ _ _ hl _ => exact hl
+    have hBSTr : IsBST r := by
+      cases hBST with | node _ _ _ _ _ _ hr => exact hr
+    -- Split on z's relation to the root `a`.
+    by_cases hza : z = a
+    · -- z = a: then z ∈ searchPath, contradicting hz.
+      exfalso; apply hz
+      rw [hza]
+      unfold BinaryTree.searchPath
+      by_cases hqa : q = a
+      · rw [if_pos hqa]; simp
+      · rw [if_neg hqa]
+        split_ifs <;> simp
+    · by_cases hzlt : z < a
+      · -- Descent goes left: subtree_rooted_at = subtree_rooted_at l z.
+        have hsub_eq : subtree_rooted_at (.node l a r) z = subtree_rooted_at l z := by
+          change (if z = a then (BinaryTree.node l a r)
+                    else if z < a then subtree_rooted_at l z
+                    else subtree_rooted_at r z) = subtree_rooted_at l z
+          rw [if_neg hza, if_pos hzlt]
+        rw [hsub_eq] at hk
+        -- k is a descendant of l, so k ∈ l.toKeyList and thus k < a.
+        have hk_in_l : k ∈ l.toKeyList := subtree_rooted_at_toKeyList_subset l z k hk
+        have hk_lt_a : k < a := ForallTree.forall_mem_toKeyList hFL k hk_in_l
+        have hk_ne_a : k ≠ a := fun h => by omega
+        intro hmem
+        -- Analyse which branch of (.node l a r).searchPath q `hmem` sits in.
+        unfold BinaryTree.searchPath at hmem
+        by_cases hqa : q = a
+        · rw [if_pos hqa] at hmem
+          simp at hmem; exact hk_ne_a hmem
+        · rw [if_neg hqa] at hmem
+          by_cases hqlt : q < a
+          · rw [if_pos hqlt] at hmem
+            rcases List.mem_cons.mp hmem with rfl | hmem'
+            · exact hk_ne_a rfl
+            · -- k ∈ l.searchPath q; apply IH on l.
+              have hz_notin_l : z ∉ l.searchPath q := by
+                intro hz_l; apply hz
+                unfold BinaryTree.searchPath
+                rw [if_neg hqa, if_pos hqlt]
+                exact List.mem_cons.mpr (Or.inr hz_l)
+              exact IsBST.searchPath_subtree_disjoint hBSTl q z hz_notin_l k hk hmem'
+          · rw [if_neg hqlt] at hmem
+            rcases List.mem_cons.mp hmem with rfl | hmem'
+            · exact hk_ne_a rfl
+            · -- k ∈ r.searchPath q ⇒ k ∈ r.toKeyList ⇒ k > a; but k < a.
+              have hk_in_r : k ∈ r.toKeyList :=
+                searchPath_subset_toKeyList r q k hmem'
+              have hk_gt_a : a < k := ForallTree.forall_mem_toKeyList hFR k hk_in_r
+              omega
+      · -- Descent goes right: z > a.
+        have hzgt : a < z := by omega
+        have hsub_eq : subtree_rooted_at (.node l a r) z = subtree_rooted_at r z := by
+          change (if z = a then (BinaryTree.node l a r)
+                    else if z < a then subtree_rooted_at l z
+                    else subtree_rooted_at r z) = subtree_rooted_at r z
+          rw [if_neg hza, if_neg hzlt]
+        rw [hsub_eq] at hk
+        have hk_in_r : k ∈ r.toKeyList := subtree_rooted_at_toKeyList_subset r z k hk
+        have hk_gt_a : a < k := ForallTree.forall_mem_toKeyList hFR k hk_in_r
+        have hk_ne_a : k ≠ a := fun h => by omega
+        intro hmem
+        unfold BinaryTree.searchPath at hmem
+        by_cases hqa : q = a
+        · rw [if_pos hqa] at hmem
+          simp at hmem; exact hk_ne_a hmem
+        · rw [if_neg hqa] at hmem
+          by_cases hqlt : q < a
+          · rw [if_pos hqlt] at hmem
+            rcases List.mem_cons.mp hmem with rfl | hmem'
+            · exact hk_ne_a rfl
+            · have hk_in_l : k ∈ l.toKeyList :=
+                searchPath_subset_toKeyList l q k hmem'
+              have hk_lt_a : k < a := ForallTree.forall_mem_toKeyList hFL k hk_in_l
+              omega
+          · rw [if_neg hqlt] at hmem
+            rcases List.mem_cons.mp hmem with rfl | hmem'
+            · exact hk_ne_a rfl
+            · have hz_notin_r : z ∉ r.searchPath q := by
+                intro hz_r; apply hz
+                unfold BinaryTree.searchPath
+                rw [if_neg hqa, if_neg hqlt]
+                exact List.mem_cons.mpr (Or.inr hz_r)
+              exact IsBST.searchPath_subtree_disjoint hBSTr q z hz_notin_r k hk hmem'
+
+/-- **`vVal` agrees whenever both colorings coincide on the keys of the
+sub-tree rooted at `x`.**
+
+Both `gVal` and `hVal` read only from the right spines of, respectively,
+`subtree_rooted_at t x` and its left child; these spines are subsets of
+`(subtree_rooted_at t x).toKeyList`. -/
+lemma vVal_eq_of_color_agree_on_subtree
+    (col col' : ColorState) (t : BinaryTree) (x : ℕ)
+    (h : ∀ y ∈ (subtree_rooted_at t x).toKeyList, col y = col' y) :
+    vVal col t x = vVal col' t x := by
+  have hisCol : ∀ y ∈ (subtree_rooted_at t x).toKeyList,
+      col.isColored y = col'.isColored y := by
+    intro y hy; unfold ColorState.isColored; rw [h y hy]
+  -- gVal equality.
+  have hg : gVal col t x = gVal col' t x := by
+    unfold gVal
+    congr 1
+    apply List.filter_congr
+    intro k hk
+    exact hisCol k (BinaryTree.rightSpineKeys_subset_toKeyList _ k hk)
+  -- hVal equality (case on the subtree shape).
+  have hh : hVal col t x = hVal col' t x := by
+    unfold hVal
+    -- Generalize the subtree so the `match` reduces via `cases`.
+    generalize hs : subtree_rooted_at t x = sub at hisCol ⊢
+    cases sub with
+    | empty => rfl
+    | node l a r =>
+      simp only [BinaryTree.toKeyList, List.mem_append, List.mem_singleton] at hisCol
+      show (List.filter (fun k => col.isColored k) l.rightSpineKeys).length
+         = (List.filter (fun k => col'.isColored k) l.rightSpineKeys).length
+      congr 1
+      apply List.filter_congr
+      intro k hk
+      have hk_in_l : k ∈ l.toKeyList :=
+        BinaryTree.rightSpineKeys_subset_toKeyList _ k hk
+      exact hisCol k (Or.inl (Or.inl hk_in_l))
+  unfold vVal
+  rw [hg, hh]
+
+/-- **Off-path `vVal` is preserved through `stepColor ∘ splay`.**
+
+For `z ∉ t.searchPath q` and `IsBST t`, the post-splay colouring and tree
+leave `vVal … z` invariant.  Combines:
+  * `subtree_rooted_at_splay_off_path` — the descent at `z` is unchanged;
+  * `stepColor_color_eq_of_not_mem_searchPath` — colours outside the
+    search path are untouched;
+  * `IsBST.searchPath_subtree_disjoint` — in a BST, the keys inside
+    `subtree_rooted_at t z` are all off-path. -/
+lemma vVal_stepColor_splay_off_path
+    (col : ColorState) (t : BinaryTree) (q z : ℕ)
+    (hBST : IsBST t) (hz : z ∉ t.searchPath q) :
+    vVal (stepColor col t (splay t q) q).1 (splay t q) z = vVal col t z := by
+  set col' := (stepColor col t (splay t q) q).1 with hcol'
+  -- Step 1: bridge the tree change via off-path descent invariance.
+  have htree := subtree_rooted_at_splay_off_path t q z hBST hz
+  -- Step 2: equality on subtree keys (for either tree).
+  have hkeys_off : ∀ y ∈ (subtree_rooted_at t z).toKeyList, y ∉ t.searchPath q :=
+    IsBST.searchPath_subtree_disjoint hBST q z hz
+  have hagree : ∀ y ∈ (subtree_rooted_at (splay t q) z).toKeyList, col y = col' y := by
+    intro y hy
+    rw [htree] at hy
+    have : y ∉ t.searchPath q := hkeys_off y hy
+    exact (stepColor_color_eq_of_not_mem_searchPath col t (splay t q) q y this).symm
+  -- Step 3: apply the colour-agreement lemma, then the tree descent lemma.
+  calc vVal col' (splay t q) z
+      = vVal col (splay t q) z := by
+        exact (vVal_eq_of_color_agree_on_subtree col col' (splay t q) z hagree).symm
+    _ = vVal col t z := vVal_splay_off_path col t q z hBST hz
+
 /-- **Elmasry Lemma 1(c) (monotonicity of v under one splay).**
 If `2 ≤ vVal col t z` in the pre-splay state, then the post-splay v-value
 `vVal col' (splay t q) z ≥ 2`, where `col' = (stepColor …).1`.
@@ -2601,4 +3042,3 @@ theorem sequential_theorem: ∃ c, ∀ n, let X := one_to_n n
   rw [hCost, htot]
   linarith
   -- EVOLVE-BLOCK-END
-
