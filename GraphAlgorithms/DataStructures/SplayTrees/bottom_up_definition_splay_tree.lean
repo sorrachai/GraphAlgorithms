@@ -4,17 +4,19 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Anton Kovsharov, Antoine du Fresne von Hohenesche, Sorrachai Yingchareonthawornchai
 -/
 
-import GraphAlgorithms.DataStructures.SplayTrees.BinaryTree
-import Mathlib.Data.Real.Basic
+module
 
-set_option autoImplicit false
+public import GraphAlgorithms.DataStructures.SplayTrees.BinaryTree
+public import Mathlib.Data.Real.Basic
+
+
+variable {α : Type}
 
 -- =========================================================================
 -- §1  Definitions
 -- =========================================================================
 -- Rotation primitives, direction / frame types, descend, splayUp, splayBU.
 
-variable {α : Type}
 
 def rotateRight : BinaryTree α → BinaryTree α
   | .node (.node a x b) y c => .node a x (.node b y c)
@@ -46,13 +48,13 @@ def applyChild (d : Dir) (op : BinaryTree α → BinaryTree α) : BinaryTree α 
 
 /-- One frame of the search path: the direction we took from this ancestor,
 its key, and the subtree we did *not* descend into. -/
-structure Frame (α) where
+structure Frame (α : Type) where
   dir : Dir
   key : α
   sibling : BinaryTree α
 
 /-- Re-attach a subtree `c` below the ancestor described by `f`. -/
-def Frame.attach {α} (c : BinaryTree α) (f : Frame α) : BinaryTree α :=
+def Frame.attach (c : BinaryTree α) (f : Frame α) : BinaryTree α :=
   match f.dir with
   | .L => .node c f.key f.sibling
   | .R => .node f.sibling f.key c
@@ -60,7 +62,7 @@ def Frame.attach {α} (c : BinaryTree α) (f : Frame α) : BinaryTree α :=
 /-- Descend from `t` toward `q`, returning the subtree reached (either the
 matching node or `.empty` if `q` is absent) and the path above it. The head
 of the returned list is the deepest frame (parent of the returned subtree). -/
-def descend {α} [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α × List (Frame α) :=
+def descend [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α × List (Frame α) :=
   go t []
 where
   go : BinaryTree α → List (Frame α) → BinaryTree α × List (Frame α)
@@ -78,11 +80,11 @@ up. Each double step (parent `f1`, grandparent `f2`) is:
   `f2.dir`-child (in direction `f1.dir`), then one outer rotation (in
   direction `f2.dir`).
 A leftover single frame is a plain zig/zag. -/
-def splayUp {α} : BinaryTree α → List (Frame α) → BinaryTree α
+def splayUp : BinaryTree α → List (Frame α) → BinaryTree α
   | c, [] => c
-  | c, [f] => f.dir.bringUp (Frame.attach c f)
+  | c, [f] => f.dir.bringUp (f.attach c)
   | c, f1 :: f2 :: rest =>
-    let s := Frame.attach (Frame.attach c f1) f2
+    let s := f2.attach (f1.attach c)
     let s' :=
       if f1.dir = f2.dir then
         f2.dir.bringUp (f2.dir.bringUp s)
@@ -92,13 +94,13 @@ def splayUp {α} : BinaryTree α → List (Frame α) → BinaryTree α
 
 /-- Bottom-up splay: the "textbook" splay analysed by Tarjan, Sundar, and
 Elmasry. If `q` is absent the last visited ancestor is splayed to the root. -/
-def splayBU {α} [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α :=
+def splayBU [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α :=
   match descend t q with
   | (.empty, []) => .empty
-  | (.empty, f :: rest) => splayUp α (f.attach .empty) rest
-  | (x@(.node _ _ _), path) => splayUp α x path
+  | (.empty, f :: rest) => splayUp (f.attach .empty) rest
+  | (x@(.node _ _ _), path) => splayUp x path
 
 /-- Cost of a bottom-up splay: one unit per rotation, i.e. the length of the
 search path. -/
-def splayBU.cost {α} [LinearOrder α] (t : BinaryTree α) (q : α) : ℝ :=
+def splayBU.cost [LinearOrder α] (t : BinaryTree α) (q : α) : ℝ :=
   (descend t q).2.length

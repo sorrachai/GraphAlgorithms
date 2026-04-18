@@ -13,12 +13,6 @@ public import Mathlib.Combinatorics.SimpleGraph.Metric
 # Binary Tree
 
   In this file we introduce the `BinaryTree` data structure and its basic operations.
-
---
-## Main results
-
--
--
 -/
 
 variable {α : Type}

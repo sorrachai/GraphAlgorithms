@@ -14,5 +14,9 @@ maxSynthPendingDepth = 3
 name = "mathlib"
 scope = "leanprover-community"
 
+[[require]]
+name = "cslib"
+scope = "leanprover"
+
 [[lean_lib]]
 name = "GraphAlgorithms"
