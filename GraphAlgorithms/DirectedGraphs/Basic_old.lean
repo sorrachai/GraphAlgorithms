@@ -80,7 +80,6 @@ abbrev induce (G : DirectedGraph α β) (S : Finset α) : DirectedGraph α β wh
 the type `walk u v` consists of all walks starting at `u` and ending at `v`.
 Note that this definition does not depend on the graph.
 -/
-
 inductive Walk (α β : Type*) : α → α → Type _
   | nil {v : α} : Walk α β v v
   | cons {u v w : α} (e : DirectedEdge α β)

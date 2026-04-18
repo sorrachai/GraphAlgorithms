@@ -9,7 +9,6 @@ import Mathlib.Data.Finset.Basic
 set_option tactic.hygienic false
 variable {α : Type*} {β : Type*} [DecidableEq α] [DecidableEq β]
 
-
 structure UndirectedEdge (α β : Type*) where
   id : β
   endpoints : Sym2 α
