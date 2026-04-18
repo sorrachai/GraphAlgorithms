@@ -25,10 +25,18 @@ def BinaryTree.num_nodes : BinaryTree → ℕ
 | .empty => 0
 | .node left _ right => 1 + (num_nodes left) + (num_nodes right)
 
+@[simp] lemma BinaryTree.num_nodes_empty : BinaryTree.empty.num_nodes = 0 := rfl
+@[simp] lemma BinaryTree.num_nodes_node (l : BinaryTree) (k : ℕ) (r : BinaryTree) :
+    (BinaryTree.node l k r).num_nodes = 1 + l.num_nodes + r.num_nodes := rfl
+
 /-- In-order traversal as a list of keys. -/
 def BinaryTree.toKeyList : BinaryTree → List ℕ
   | .empty => []
   | .node l k r => l.toKeyList ++ [k] ++ r.toKeyList
+
+@[simp] lemma BinaryTree.toKeyList_empty : BinaryTree.empty.toKeyList = [] := rfl
+@[simp] lemma BinaryTree.toKeyList_node (l : BinaryTree) (k : ℕ) (r : BinaryTree) :
+    (BinaryTree.node l k r).toKeyList = l.toKeyList ++ [k] ++ r.toKeyList := rfl
 
 /-- Number of nodes on the search path for `q` in `t`. Zero on the empty
 tree; on a node this counts the root plus (if `q ≠ k`) the search path
@@ -108,15 +116,15 @@ inductive IsBST : BinaryTree → Prop
 -- Accessor lemmas for ForallTree
 -- ============================================================
 
-lemma ForallTree.left_sub {p : ℕ → Prop} {l : BinaryTree} {k : ℕ} {r : BinaryTree}
+@[simp] lemma ForallTree.left_sub {p : ℕ → Prop} {l : BinaryTree} {k : ℕ} {r : BinaryTree}
     (h : ForallTree p (.node l k r)) : ForallTree p l := by
   cases h with | node _ _ _ hl _ _ => exact hl
 
-lemma ForallTree.root {p : ℕ → Prop} {l : BinaryTree} {k : ℕ} {r : BinaryTree}
+@[simp] lemma ForallTree.root {p : ℕ → Prop} {l : BinaryTree} {k : ℕ} {r : BinaryTree}
     (h : ForallTree p (.node l k r)) : p k := by
   cases h with | node _ _ _ _ hk _ => exact hk
 
-lemma ForallTree.right_sub {p : ℕ → Prop} {l : BinaryTree} {k : ℕ} {r : BinaryTree}
+@[simp] lemma ForallTree.right_sub {p : ℕ → Prop} {l : BinaryTree} {k : ℕ} {r : BinaryTree}
     (h : ForallTree p (.node l k r)) : ForallTree p r := by
   cases h with | node _ _ _ _ _ hr => exact hr
 
@@ -124,19 +132,19 @@ lemma ForallTree.right_sub {p : ℕ → Prop} {l : BinaryTree} {k : ℕ} {r : Bi
 -- Accessor lemmas for IsBST
 -- ============================================================
 
-lemma IsBST.forallTree_left {l : BinaryTree} {k : ℕ} {r : BinaryTree}
+@[simp] lemma IsBST.forallTree_left {l : BinaryTree} {k : ℕ} {r : BinaryTree}
     (h : IsBST (.node l k r)) : ForallTree (· < k) l := by
   cases h with | node _ _ _ hl _ _ _ => exact hl
 
-lemma IsBST.forallTree_right {l : BinaryTree} {k : ℕ} {r : BinaryTree}
+@[simp] lemma IsBST.forallTree_right {l : BinaryTree} {k : ℕ} {r : BinaryTree}
     (h : IsBST (.node l k r)) : ForallTree (k < ·) r := by
   cases h with | node _ _ _ _ hr _ _ => exact hr
 
-lemma IsBST.left_bst {l : BinaryTree} {k : ℕ} {r : BinaryTree}
+@[simp] lemma IsBST.left_bst {l : BinaryTree} {k : ℕ} {r : BinaryTree}
     (h : IsBST (.node l k r)) : IsBST l := by
   cases h with | node _ _ _ _ _ hl _ => exact hl
 
-lemma IsBST.right_bst {l : BinaryTree} {k : ℕ} {r : BinaryTree}
+@[simp] lemma IsBST.right_bst {l : BinaryTree} {k : ℕ} {r : BinaryTree}
     (h : IsBST (.node l k r)) : IsBST r := by
   cases h with | node _ _ _ _ _ _ hr => exact hr
 
