@@ -444,7 +444,7 @@ private lemma root_after_zagZag (q lk rk : ℕ)
 
 
 /-- The root of the splayed tree is the target key if it is present. -/
-theorem splay_root_of_contains_v3 (t : BinaryTree) (q : ℕ)
+theorem splay_root_of_contains (t : BinaryTree) (q : ℕ)
     (hc : t.contains q) : ∃ l r, splay t q = .node l q r := by
   -- Reading guide for this proof:
   -- each `splay` branch is either
