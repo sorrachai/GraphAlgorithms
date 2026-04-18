@@ -8,7 +8,7 @@ set_option tactic.hygienic false
 inductive BinaryTree where
 | empty
 | node (left : BinaryTree) (key : ℕ) (right : BinaryTree)
-deriving Repr, BEq
+deriving Repr, BEq, DecidableEq
 
 def BinaryTree.left : BinaryTree → BinaryTree
   | .empty => .empty
@@ -24,6 +24,25 @@ theorem non_empty_exist (s : BinaryTree) (h : s ≠ BinaryTree.empty) : ∃ A k 
 def BinaryTree.num_nodes : BinaryTree → ℕ
 | .empty => 0
 | .node left _ right => 1 + (num_nodes left) + (num_nodes right)
+
+/-- In-order traversal as a list of keys. -/
+def BinaryTree.toKeyList : BinaryTree → List ℕ
+  | .empty => []
+  | .node l k r => l.toKeyList ++ [k] ++ r.toKeyList
+
+/-- Number of nodes on the search path for `q` in `t`. Zero on the empty
+tree; on a node this counts the root plus (if `q ≠ k`) the search path
+length in the appropriate subtree. -/
+def BinaryTree.search_path_len (t : BinaryTree) (q : ℕ) : ℕ :=
+  match t with
+  | .empty => 0
+  | .node left key right =>
+    if q < key then
+      1 + left.search_path_len q
+    else if key < q then
+      1 + right.search_path_len q
+    else
+      1
 
 /-
 Remark:
