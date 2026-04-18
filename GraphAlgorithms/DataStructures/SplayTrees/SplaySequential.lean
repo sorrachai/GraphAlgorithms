@@ -921,6 +921,14 @@ lemma splay_toKeyList (t : BinaryTree) (q : ℕ) :
       rw [rotate_toKeyList]
       simp [BinaryTree.toKeyList, splay'_toKeyList]
 
+/-- Splay preserves the BST invariant.
+The proof would follow from `splay_toKeyList` together with a "sorted
+in-order ↔ IsBST" characterisation that is not yet formalised.
+I will do later. -/
+lemma splay_IsBST (t : BinaryTree) (q : ℕ) (h : IsBST t) :
+    IsBST (splay t q) := by
+  sorry
+
 lemma searchPath_subset_toKeyList (t : BinaryTree) (q : ℕ) :
     ∀ k ∈ t.searchPath q, k ∈ t.toKeyList := by
   induction t with
@@ -2606,36 +2614,101 @@ lemma subtree_rooted_at_splay'_off_path_bis
     exact subtree_rooted_at_rotateLeft_nonpivot
       l rl rr k rk x hBST.forallTree_right.root hxk hxrk
 
+-- ---------------------------------------------------------------------------
+--  Off-path vVal preservation (leveraging `subtree_rooted_at_splay'_off_path`)
+-- ---------------------------------------------------------------------------
+--
+-- If `z` is not on the search path of `q` in `t`, then:
+--   (i)   the subtree rooted at `z` in `splay t q` equals that in `t`
+--         (from `subtree_rooted_at_splay'_off_path`);
+--   (ii)  `stepColor` only modifies colors of nodes on the search path
+--         (it calls `paintYellow` on `path.tail` and `processLink` on
+--         spine node pairs), so `col' k = col k` for every key `k` not
+--         on the spine;
+--   (iii) in a BST, every key in the subtree rooted at an off-path node
+--         is itself off-path (the BST descent commits once you leave the
+--         search path).
+--
+-- Combining (i)–(iii): `gVal`, `hVal`, and therefore `vVal` are unchanged
+-- for off-path nodes.  This is the formal content of Elmasry's remark
+-- "if `x` is non-black and not involved in a rotation, then `v_x` will
+-- not change" (§2, proof of Lemma 1).
+
+/-- **Off-path subtree preservation for `splay`** (extends the existing
+`subtree_rooted_at_splay'_off_path` from `splay'` to `splay`).
+If `z` is not on the search path and the tree is a BST, then
+`subtree_rooted_at (splay t q) z = subtree_rooted_at t z`. -/
+lemma subtree_rooted_at_splay_off_path
+    (q : ℕ) (t : BinaryTree) (z : ℕ)
+    (hBST : IsBST t) (hz : z ∉ t.searchPath q) :
+    subtree_rooted_at (splay t q) z = subtree_rooted_at t z := by
+  sorry  -- proof: case-split on the parity used by `splay`; each branch
+         -- delegates to `subtree_rooted_at_splay'_off_path` plus one
+         -- extra rotation (zig/zag) handled by the per-rotation nonpivot
+         -- lemmas.  I will do later.
+
+/-- **stepColor does not change the color of off-path nodes.**
+If `z ∉ t.searchPath q`, then `(stepColor col t t' q).1 z = col z`.
+`paintYellow` only touches `path.tail` and `processLink` only promotes
+endpoints of spine links (all on the path). -/
+lemma stepColor_off_path_color
+    (col : ColorState) (t t' : BinaryTree) (q z : ℕ)
+    (hz : z ∉ t.searchPath q) :
+    (stepColor col t t' q).1 z = col z := by
+  sorry  -- proof: unfold stepColor; show paintYellow and processLinks
+         -- don't touch z.  I will do later.
+
+/-- **Subtree keys are disjoint from the search path for off-path nodes.**
+In a BST, if `z ∉ t.searchPath q`, then every key `k` in the subtree
+rooted at `z` satisfies `k ∉ t.searchPath q`. -/
+lemma subtree_keys_off_path
+    (t : BinaryTree) (q z : ℕ) (hBST : IsBST t) (hz : z ∉ t.searchPath q)
+    (k : ℕ) (hk : k ∈ (subtree_rooted_at t z).toKeyList) :
+    k ∉ t.searchPath q := by
+  sorry  -- proof: BST descent commits at each level; once off the search
+         -- path, all descendants are off-path.  I will do later.
+
+/-- **Off-path vVal preservation.**  Combines subtree preservation
+(`subtree_rooted_at_splay_off_path`), color stability
+(`stepColor_off_path_color`), and subtree-key disjointness
+(`subtree_keys_off_path`) to conclude that `vVal` is unchanged for
+off-path nodes under one splay step.
+
+This is the formal version of Elmasry's "if `x` is non-black and not
+involved in a rotation, then `v_x` will not change". -/
+lemma vVal_off_path_preserved
+    (col : ColorState) (t : BinaryTree) (q z : ℕ)
+    (hBST : IsBST t) (hz : z ∉ t.searchPath q) :
+    vVal (stepColor col t (splay t q) q).1 (splay t q) z = vVal col t z := by
+  sorry  -- proof: unfold vVal/gVal/hVal; rewrite subtree_rooted_at via
+         -- `subtree_rooted_at_splay_off_path`; rewrite color filter via
+         -- `stepColor_off_path_color` applied to every key in the
+         -- rightSpine (all off-path by `subtree_keys_off_path`).
+         -- I will do later.
+
 /-- **Elmasry Lemma 1(c) (monotonicity of v under one splay).**
 If `2 ≤ vVal col t z` in the pre-splay state, then the post-splay v-value
 `vVal col' (splay t q) z ≥ 2`, where `col' = (stepColor …).1`.
 
-The paper's proof proceeds by induction over the lifetime of nodes,
-running jointly with Lemma 1(a)(b) (the `ColorInvariant`).  Each link
-event is a single rotation, for which relations (1)–(5) give
-`vz(t+1) ≥ vw(t) + vz(t)`; combined with `vw(t) ≥ 0` (Lemma 1(b) via the
-invariant) this yields `vz(t+1) ≥ vz(t)` — the "non-decreasing" claim.
+The proof splits into two cases:
 
-**Audit note (2026-04-17).** The claim as stated is strictly stronger than
-Elmasry's Lemma 1(c).  The paper's monotonicity applies only to
-**right-spine link events** — rotations of `rotateRight` shape, where
-`z` is lifted to become `w`'s parent and `w` becomes `z`'s right child.
-Our Lean `splay` also uses `rotateLeft` (zag / zagZag / zagZig branches),
-and a hand computation shows `vVal` can *decrease* under `rotateLeft`:
-for `rotateLeft (node a w (node b z c)) = node (node a w b) z c` with
-`w < z`, one finds `vVal col t' z = vVal col t z − [isColored w]`.
-These rotations are accounted for separately as the paper's **K-links**
-(Elmasry §2 lines 282–286: "black nodes are involved in at most one link
-per splay operation"), and **Lemma 1(c) is not applied to them** — the
-paper explicitly notes "the conditions of the lemma do not apply to `w`
-and `z` anymore" once they become black.
+* **Off-path** (`z ∉ t.searchPath q`): `vVal` is exactly preserved by
+  `vVal_off_path_preserved` (leveraging `subtree_rooted_at_splay'_off_path`
+  from SplaySequential).
 
-See `audit.md` for the full analysis and restructuring plan.  The
-current statement is preserved as a `sorry` pending the restructure of
-`bigVset` / `aTargetsOf` to restrict to non-black nodes. -/
+* **On-path** (`z ∈ t.searchPath q`): Elmasry's rotation analysis.
+  Each link event satisfies relations (1)–(5); combined with the
+  `ColorInvariant` (`vVal ≥ 0` for colored nodes), `vz(t+1) ≥ vz(t)`.
+
+**Audit note (2026-04-17).** The on-path case as stated is strictly stronger
+than Elmasry's Lemma 1(c).  The paper's monotonicity applies only to
+**right-spine link events** — rotations of `rotateRight` shape.
+`rotateLeft` branches (zag / zagZag / zagZig) can *decrease* `vVal`;
+these are accounted for as K-links.  The on-path sorry is pending the
+restructure of `bigVset` / `aTargetsOf` to restrict to non-black nodes. -/
 lemma lemma1c_monotone
     (col : ColorState) (t : BinaryTree) (q n z : ℕ)
-    (_hz : z < n) (hv : 2 ≤ vVal col t z) :
+    (_hz : z < n) (hBST : IsBST t) (hv : 2 ≤ vVal col t z) :
     2 ≤ vVal (stepColor col t (splay t q) q).1 (splay t q) z := by
   cases ht : t with
   | empty =>
@@ -2651,10 +2724,13 @@ lemma lemma1c_monotone
       obtain ⟨hstep, hsplay⟩ := stepColor_root col l q r
       rw [hsplay, hstep]
       exact hv
-    · -- Non-root case: rotation analysis.  Proceeds by induction on
-      -- `splay'`, at each step invoking `elmasry_relations` together with
-      -- the `ColorInvariant` to derive `vz(t+1) ≥ vz(t)`.  Deferred.
-      sorry
+    · -- Split on whether z is on the search path.
+      by_cases hz : z ∈ (BinaryTree.node l k r).searchPath q
+      · -- On-path case: Elmasry's rotation analysis (deferred).
+        sorry
+      · -- Off-path case: vVal is exactly preserved.
+        have := vVal_off_path_preserved col (.node l k r) q z hBST hz
+        omega
 
 /-- **Sub-lemma A+B.**  Pre-splay `bigVset` and A-targets both lie in the
 post-splay `bigVset`.  Under the before/after definition of `aTargetsOf`,
@@ -2663,7 +2739,8 @@ definition).  The `bigVset` part is exactly Elmasry's Lemma 1(c)
 monotonicity: `2 ≤ vVal col t z → 2 ≤ vVal col' (splay t q) z`. -/
 lemma bigVset_union_aTargets_subset
     (col : ColorState) (t : BinaryTree) (q n : ℕ)
-    (_hspine : ∀ k ∈ t.searchPath q, k < n) :
+    (_hspine : ∀ k ∈ t.searchPath q, k < n)
+    (hBST : IsBST t) :
     bigVset col t n ∪ aTargetsOf col t q n ⊆
       bigVset (stepColor col t (splay t q) q).1 (splay t q) n := by
   classical
@@ -2676,7 +2753,7 @@ lemma bigVset_union_aTargets_subset
     unfold bigVset at hzS
     rw [Finset.mem_filter, Finset.mem_range] at hzS
     refine ⟨hzS.1, ?_⟩
-    exact lemma1c_monotone col t q n z hzS.1 hzS.2
+    exact lemma1c_monotone col t q n z hzS.1 hBST hzS.2
   · rw [mem_aTargetsOf] at hzA
     exact ⟨hzA.1, hzA.2.2.2⟩
 
@@ -2704,7 +2781,8 @@ C (A-count = |A-targets|), and D (A-targets disjoint from pre-bigVset). -/
 lemma stepColor_A_bigVset
     (col : ColorState) (t : BinaryTree) (q n : ℕ)
     (hspine : ∀ k ∈ t.searchPath q, k < n)
-    (hNoDup : (t.searchPath q).Nodup) :
+    (hNoDup : (t.searchPath q).Nodup)
+    (hBST : IsBST t) :
     (stepColor col t (splay t q) q).2.A + (bigVset col t n).card ≤
       (bigVset (stepColor col t (splay t q) q).1 (splay t q) n).card := by
   set S := bigVset col t n with hS
@@ -2716,7 +2794,7 @@ lemma stepColor_A_bigVset
   have hcard_union : (S ∪ A).card = S.card + A.card := by
     rw [Finset.card_union_of_disjoint hdisj]
   -- S ∪ A ⊆ S'  (sub-lemma A+B).
-  have hsub : S ∪ A ⊆ S' := bigVset_union_aTargets_subset col t q n hspine
+  have hsub : S ∪ A ⊆ S' := bigVset_union_aTargets_subset col t q n hspine hBST
   have hcard_le : (S ∪ A).card ≤ S'.card := Finset.card_le_card hsub
   -- A.card = step A-count  (sub-lemma C).
   have hAeq : (stepColor col t (splay t q) q).2.A = A.card :=
@@ -2730,14 +2808,16 @@ lemma stepColor_A_bigVset
 
 lemma colorSequence_A_le {n : ℕ} (init : BinaryTree) (X : Fin n → ℕ)
     (hInit : ∀ k ∈ init.toKeyList, k < n)
-    (hInitND : init.toKeyList.Nodup) :
+    (hInitND : init.toKeyList.Nodup)
+    (hInitBST : IsBST init) :
     (totalCounters init X).A ≤ n := by
   unfold totalCounters colorSequence
-  -- Invariants: keys < n, toKeyList Nodup, cnt.A ≤ bigVset.card.
+  -- Invariants: keys < n, toKeyList Nodup, IsBST, cnt.A ≤ bigVset.card.
   suffices h : ∀ (L : List (Fin n)) (t : BinaryTree) (col : ColorState)
       (cnt : LinkCounters),
       (∀ k ∈ t.toKeyList, k < n) →
       t.toKeyList.Nodup →
+      IsBST t →
       cnt.A ≤ (bigVset col t n).card →
       ((L.foldl
           (fun (acc : BinaryTree × ColorState × LinkCounters) i =>
@@ -2747,31 +2827,32 @@ lemma colorSequence_A_le {n : ℕ} (init : BinaryTree) (X : Fin n → ℕ)
             let (col', dcnt) := stepColor col t t' q
             (t', col', cnt + dcnt))
           (t, col, cnt)).2.2).A ≤ n by
-    apply h (List.finRange n) init ColorState.initial 0 hInit hInitND
+    apply h (List.finRange n) init ColorState.initial 0 hInit hInitND hInitBST
     show (0 : LinkCounters).A ≤ _
     change 0 ≤ _
     exact Nat.zero_le _
   intro L
   induction L with
   | nil =>
-      intro t col cnt _ _ hInv
+      intro t col cnt _ _ _ hInv
       have := bigVset_card_le col t n
       simpa using Nat.le_trans hInv this
   | cons i L ih =>
-      intro t col cnt htKeys htND hInv
+      intro t col cnt htKeys htND htBST hInv
       simp only [List.foldl_cons]
       apply ih
       · intro k hk
         rw [splay_toKeyList] at hk
         exact htKeys k hk
       · rw [splay_toKeyList]; exact htND
+      · exact splay_IsBST t (X i) htBST
       · have hspine : ∀ k ∈ t.searchPath (X i), k < n := by
           intro k hk
           exact htKeys k (searchPath_subset_toKeyList t (X i) k hk)
         have hspineND : (t.searchPath (X i)).Nodup :=
           searchPath_nodup_of_toKeyList_nodup t (X i) htND
         have hstep :=
-          stepColor_A_bigVset col t (X i) n hspine hspineND
+          stepColor_A_bigVset col t (X i) n hspine hspineND htBST
         change (cnt + (stepColor col t (splay t (X i)) (X i)).2).A ≤
           (bigVset (stepColor col t (splay t (X i)) (X i)).1
                    (splay t (X i)) n).card
@@ -2779,6 +2860,28 @@ lemma colorSequence_A_le {n : ℕ} (init : BinaryTree) (X : Fin n → ℕ)
         omega
 
 -- EVOLVE-BLOCK-END
+
+-- ---------------------------------------------------------------------------
+--  B-link bound:  cnt.B ≤ 3n/2  (Elmasry's credit argument)
+-- ---------------------------------------------------------------------------
+--
+-- Each node `x` carries a "credit" of `h_x(t)² / 2`.  For a B-link to `z`,
+-- Elmasry's relations (3) and (5) give a "drop" `d = gVal col t z − hVal col t' z`
+-- satisfying `d ≥ v_z(t) − 1 ≥ 1` (since `v_z(t) ≥ 2` for a B-link).
+-- The released credit pays for the link.  Initialising a yellow node costs
+-- at most `3/2` credits (worst case: `h_x(t)` goes from 0 to 1 when x first
+-- appears on a right spine), and there are `n` nodes, giving the `3n/2` bound.
+
+/-- **B-link bound (Elmasry credit argument).**
+`(totalCounters init X).B ≤ 3 * n / 2` when `init` has `n` distinct keys
+in `[0, n)` and is a BST.  The proof is a potential-method accounting
+argument tracking `∑_x h_x(t)² / 2` credits across all splay steps.  -/
+lemma colorSequence_B_le {n : ℕ} (init : BinaryTree) (X : Fin n → ℕ)
+    (hInit : ∀ k ∈ init.toKeyList, k < n)
+    (hInitND : init.toKeyList.Nodup)
+    (hBST : IsBST init) :
+    (totalCounters init X).B * 2 ≤ 3 * n := by
+  sorry  -- proof: credit-method accounting.  I will do later.
 
 theorem sequential_theorem: ∃ c, ∀ n, let X := one_to_n n
   ∀ (init : BinaryTree), (h_size: init.num_nodes = n) →
@@ -2861,9 +2964,27 @@ theorem sequential_theorem: ∃ c, ∀ n, let X := one_to_n n
       have : (a : ℕ) = (b : ℕ) := hab
       exact Fin.ext this
     have : cnt.A ≤ n := by
-      rw [hcnt]; exact colorSequence_A_le init X hInit hInitND
+      rw [hcnt]; exact colorSequence_A_le init X hInit hInitND h_bst
     exact_mod_cast this
-  have hB : (cnt.B : ℝ) ≤ (3 : ℝ) / 2 * n := by sorry
+  have hB : (cnt.B : ℝ) ≤ (3 : ℝ) / 2 * n := by
+    have hInit : ∀ k ∈ init.toKeyList, k < n := by
+      intro k hk
+      rw [h_keys] at hk
+      simp at hk
+      obtain ⟨i, _, rfl⟩ := hk
+      exact i.isLt
+    have hInitND : init.toKeyList.Nodup := by
+      rw [h_keys]
+      refine (List.nodup_finRange n).map ?_
+      intro a b hab
+      show a = b
+      have : (a : ℕ) = (b : ℕ) := hab
+      exact Fin.ext this
+    have hle := colorSequence_B_le init X hInit hInitND h_bst
+    -- `cnt.B * 2 ≤ 3 * n` implies `(cnt.B : ℝ) ≤ 3/2 * n`
+    -- Note: cnt is definitionally totalCounters init X
+    have hB_cast : (cnt.B : ℝ) * 2 ≤ 3 * (n : ℝ) := by exact_mod_cast hle
+    linarith
   have hK : (cnt.K : ℝ) ≤ n := by
     have : cnt.K ≤ n := by rw [hcnt]; exact colorSequence_K_le init X
     exact_mod_cast this

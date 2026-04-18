@@ -891,7 +891,7 @@ theorem φ_zig (c : BinaryTree) (f : Frame) :
       simp [φ, rank]
       linarith [rank_nonneg (BinaryTree.node .empty f.key f.sibling)]
     | node A x B =>
-      simp only [φ_node, φ_empty]
+      simp only [φ_node]
       have hrs : rank (BinaryTree.node A x (BinaryTree.node B f.key f.sibling)) =
           rank (BinaryTree.node (BinaryTree.node A x B) f.key f.sibling) :=
         rank_eq_of_num_nodes_eq (by simp [BinaryTree.num_nodes]; omega)
