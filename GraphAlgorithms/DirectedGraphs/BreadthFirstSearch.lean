@@ -15,27 +15,7 @@ variable {α : Type*} [DecidableEq α]
 open SimpleDiGraph
 open Walk
 
-/-- A path is a walk whose support (the list of vertices from VertexSeq.toList)
-    has no duplicate vertices — List.Nodup. -/
-def IsPathIn (G : SimpleDiGraph α) (w : Walk α) : Prop := IsWalkIn G w ∧ w.IsPath
-
-/-- Shortest path - analytical definition of distance:
-    the length of minimum path between two vertices `v₁` and `v₂` in graph `G` -/
-noncomputable def shortestPath (G : SimpleDiGraph α) (v₁ : α) (v₂ : α) : ℕ∞ :=
-  /- ⨅: the indexed infimum (greatest lower bound) operator.
-     - `⨅ (x : T), f x` is `iInf f`
-     - `⨅ (x : T) (_ : P x), f x` is `iInf (fun x => iInf (fun _ : P x => f x))`,
-       a nested `iInf` where the inner one ranges over proofs of `P x`.
-       When `P x` is False (no proof exists), `iInf` over an empty type gives `⊤`.
-     Here it means the infimum (minimum) of `w.length` over all walks `w` satisfying the condition.
-     When the condition is empty (no such path exists), ⨅ over an empty set
-     in ℕ∞ gives ⊤ (infinity) automatically. -/
-  ⨅ (w : Walk α) (_ : IsPathIn G w ∧ w.head = v₁ ∧ w.tail = v₂), (w.length : ℕ∞)
-
--- TODO: Lemma22.1 -> property of shortestPath:
--- let s ∈ V(G), ∀ (u, v) ∈ E(G), shortestPath G s v ≤ shortestPath G s u + 1
-
-namespace BreadthFirstSearch
+namespace bfsAlgorithm
 
 /-- Core BFS traversal that computes distances from a fixed root to all vertices.
     Processes one frontier level per recursive call, accumulating distances in `dist`.
@@ -74,23 +54,88 @@ def bfs [Fintype α] (G : SimpleDiGraph α) :
          `frontier` becomes `next`, `d` increments by 1. -/
       bfs G n (visited ∪ next) next (d + 1) dist'
 
-/-- Computes the BFS distance from `root` to every vertex in `G`.
+/-- BFS distance map from `v` to all vertices of `G`.
     Reachable vertices receive their shortest-path distance (as `(d : ℕ∞)`);
     unreachable vertices receive `⊤` (infinity). -/
-def bfsDistances [Fintype α] (G : SimpleDiGraph α) (root : α) : α → ℕ∞ :=
-  bfs G (Fintype.card α) {root} {root} 0 (fun _ => ⊤)
-
-end BreadthFirstSearch
-
-/-- BFS distance map from `v` to all vertices of `G`.
-    Returns `⊤` for vertices unreachable from `v`. -/
-def Distances [Fintype α] (G : SimpleDiGraph α) (v : α) : α → ℕ∞ :=
-  BreadthFirstSearch.bfsDistances G v
+def bfsDistances [Fintype α] (G : SimpleDiGraph α) (v : α) : α → ℕ∞ :=
+  bfs G (Fintype.card α) {v} {v} 0 (fun _ => ⊤)
 
 /-- The shortest distance from `v₁` to `v₂` in directed graph `G`.
     Returns `⊤` if `v₂` is unreachable from `v₁`. Computed via BFS. -/
-def Distance [Fintype α] (G : SimpleDiGraph α) (v₁ : α) (v₂ : α) : ℕ∞ :=
-  Distances G v₁ v₂
+def bfsDistance [Fintype α] (G : SimpleDiGraph α) (v₁ : α) (v₂ : α) : ℕ∞ :=
+  bfsDistances G v₁ v₂
+
+end bfsAlgorithm
+
+
+-- Analytical definition of `path` for bfs correctness analysis.
+namespace Path
+
+/-- A path is a walk whose support (the list of vertices from VertexSeq.toList)
+    has no duplicate vertices — List.Nodup. -/
+def IsPathIn [Fintype α] (G : SimpleDiGraph α) (w : Walk α) : Prop := IsWalkIn G w ∧ w.IsPath
+
+lemma IsPathIn.suffix [Fintype α] (G : SimpleDiGraph α) (w : Walk α) (u : α) (hu : u ∈ w.support)
+    (hw : IsPathIn G w) :
+    IsPathIn G ⟨w.seq.dropUntil u hu, dropUntil_iswalk w.seq u hu w.valid⟩ := by
+  constructor
+  · -- IsWalkIn: edges of suffix are edges of w; prove by induction on IsWalkIn w
+    sorry -- medium difficulty; follows by induction on the IsWalkIn constructor
+  · -- IsPath: suffix support is duplicate-free (dropUntil preserves Nodup)
+    unfold Walk.IsPath Walk.support
+    exact VertexSeq.dropUntil_toList_nodup hu hw.2
+
+
+/-- Shortest path - analytical definition of distance:
+    the length of minimum path between two vertices `v₁` and `v₂` in graph `G` -/
+noncomputable def shortestPath [Fintype α] (G : SimpleDiGraph α) (v₁ : α) (v₂ : α) : ℕ∞ :=
+  /- ⨅: the indexed infimum (greatest lower bound) operator.
+     - `⨅ (x : T), f x` is `iInf f`
+     - `⨅ (x : T) (_ : P x), f x` is `iInf (fun x => iInf (fun _ : P x => f x))`,
+       a nested `iInf` where the inner one ranges over proofs of `P x`.
+       When `P x` is False (no proof exists), `iInf` over an empty type gives `⊤`.
+     Here it means the infimum (minimum) of `w.length` over all walks `w` satisfying the condition.
+     When the condition is empty (no such path exists), ⨅ over an empty set
+     in ℕ∞ gives ⊤ (infinity) automatically. -/
+  ⨅ (w : Walk α) (_ : IsPathIn G w ∧ w.head = v₁ ∧ w.tail = v₂), (w.length : ℕ∞)
+
+/-- Lemma 22.1 in CLRS: the triangle inequality for shortest paths.
+    ∀ s ∈ V(G), ∀ (u, v) ∈ E(G), shortestPath G s v ≤ shortestPath G s u + 1 -/
+lemma shortestPath_triangle_inequality [Fintype α] (G : SimpleDiGraph α) (s u v : α)
+    (h_su : shortestPath G s u ≠ ⊤) (h_uv : (u, v) ∈ E(G)) :
+    shortestPath G s v ≤ shortestPath G s u + 1 := by
+  sorry
+
+end Path
+
+
+namespace bfsCorrectness
+
+/-- Lemma 22.2 in CLRS: BFS bounds the shortest path.
+    Suppose that BFS is run on G from a given source vertex s ∈ V.
+    Then upon termination, ∀ v ∈ V, the distance computed by BFS satisfies:
+    bfsDistances G s v ≥ shortestPath G s v -/
+lemma bfs_bounds_shortest_path [Fintype α] (G : SimpleDiGraph α) (s v : α)
+    (h_s : s ∈ G.vertexSet) :
+    bfsAlgorithm.bfsDistances G s v ≥ Path.shortestPath G s v := by
+  sorry
+
+/-- Lemma 22.3 in CLRS: During the execution of BFS on a graph G,
+    the `frontier` contains the vertices {v₁, ..., vᵣ}, where v₁ is the head and vᵣ is the tail.
+    Then dist' vᵣ ≤ dist' v₁ + 1. -/
+lemma bfs_triangle_inequality [Fintype α] (G : SimpleDiGraph α) (root : α) (v₁ v₂ : α)
+    (h_root : root ∈ G.vertexSet) :
+    bfsAlgorithm.bfsDistances G root v₂ ≤ bfsAlgorithm.bfsDistances G root v₁ + 1 := by
+  sorry
+
+/-- Corollary 22.4 in CLRS: For vertices vᵢ and vⱼ are enqueued during the execution of BFS,
+    and that vᵢ is enqueued before vⱼ. Then dist' vᵢ ≤ dist' vⱼ at the time that vⱼ is enqueued.
+    * This turns out a tautology in our implementation. -/
+lemma bfs_enqueue_order [Fintype α] (G : SimpleDiGraph α) (root : α) (vᵢ vⱼ : α)
+    (h_root : root ∈ G.vertexSet)
+    (h_enqueue : bfsAlgorithm.bfsDistances G root vᵢ ≤ bfsAlgorithm.bfsDistances G root vⱼ) :
+    bfsAlgorithm.bfsDistances G root vᵢ ≤ bfsAlgorithm.bfsDistances G root vⱼ := by
+  sorry
 
 /-- Sub Goal B for `bfs_correct`:
     If `bfs G n visited frontier d dist v` = k,
@@ -99,21 +144,21 @@ lemma bfs_sound [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α)
     (n : ℕ) (visited frontier : Finset α) (d : ℕ) (init_dist : α → ℕ∞)
     -- INV-1: every distance already in `init_dist` corresponds to a real path from `root`
     (h_dist : ∀ v : α, init_dist v ≠ ⊤ →
-        ∃ w : Walk α, IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧
+        ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧
           (w.length : ℕ∞) = init_dist v)
     -- INV-2: every `frontier` vertex has a path of length `d` whose vertices lie in `visited`
     (h_front : ∀ v ∈ frontier,
-        ∃ w : Walk α, IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧
+        ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧
           (w.length : ℕ∞) = d ∧ ∀ x ∈ w.support, x ∈ visited)
-    (hv : BreadthFirstSearch.bfs G n visited frontier d init_dist v ≠ ⊤) :
-    ∃ w : Walk α, IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧
-        (w.length : ℕ∞) = BreadthFirstSearch.bfs G n visited frontier d init_dist v := by
+    (hv : bfsAlgorithm.bfs G n visited frontier d init_dist v ≠ ⊤) :
+    ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧
+        (w.length : ℕ∞) = bfsAlgorithm.bfs G n visited frontier d init_dist v := by
   induction n generalizing visited frontier d init_dist with
   | zero =>
-    simp only [BreadthFirstSearch.bfs] at hv ⊢
+    simp only [bfsAlgorithm.bfs] at hv ⊢
     exact h_dist v hv
   | succ n ih =>
-    simp only [BreadthFirstSearch.bfs] at hv ⊢
+    simp only [bfsAlgorithm.bfs] at hv ⊢
     split_ifs with h_empty
     · -- frontier = ∅: bfs returns init_dist unchanged
       simp only [h_empty] at hv
@@ -180,11 +225,11 @@ lemma bfs_sound [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α)
 lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
     (n : ℕ) (visited frontier : Finset α) (d : ℕ) (dist : α → ℕ∞)
     (v : α) (hv_vis : v ∈ visited) (hv_fron : v ∉ frontier) :
-    BreadthFirstSearch.bfs G n visited frontier d dist v = dist v := by
+    bfsAlgorithm.bfs G n visited frontier d dist v = dist v := by
   induction n generalizing visited frontier d dist with
-  | zero => simp [BreadthFirstSearch.bfs]
+  | zero => simp [bfsAlgorithm.bfs]
   | succ n ih =>
-    simp only [BreadthFirstSearch.bfs]
+    simp only [bfsAlgorithm.bfs]
     split_ifs with h_empty
     · -- frontier = ∅: bfs returns dist unchanged
       rfl
@@ -203,15 +248,15 @@ lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
     then after k more BFS rounds, v will appear in dist with value ≤ d + k. -/
 lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
     (n : ℕ) (visited frontier : Finset α) (d : ℕ) (init_dist : α → ℕ∞)
-    (w : Walk α) (hw : IsPathIn G w) (hw_head : w.head ∈ frontier)
+    (w : Walk α) (hw : Path.IsPathIn G w) (hw_head : w.head ∈ frontier)
     (hw_tail : w.tail = v) (hw_avoid : ∀ x ∈ w.support, x ∉ visited \ frontier)
     (hfv : frontier ⊆ visited)
     (hn : w.length < n) :
-    BreadthFirstSearch.bfs G n visited frontier d init_dist v ≤ d + w.length := by
+    bfsAlgorithm.bfs G n visited frontier d init_dist v ≤ d + w.length := by
   induction n generalizing visited frontier d init_dist w with
   | zero => exact absurd hn (Nat.not_lt_zero _)
   | succ n ih =>
-    simp only [BreadthFirstSearch.bfs]
+    simp only [bfsAlgorithm.bfs]
     split_ifs with h_empty
     · -- frontier = ∅: contradicts hw_head
       simp [h_empty] at hw_head
@@ -235,29 +280,32 @@ lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
         simp [h_len]
       · -- w.length = k + 1, decompose walk
         -- get the second vertex in the support (index 1) and split the walk there
-        have h_support_len : w.support.length = w.length + 1 := by sorry
+        have h_support_len : w.support.length = w.length + 1 := by
+          simp [Walk.support, VertexSeq.toList_length_eq]
         sorry
 
 /-- Sub Goal A for `bfs_correct`:
     If a path of length `k` exists from `root` vertex to `v` in `G`,
     then BFS returns `distance ≤ k` for `v`. -/
 lemma bfs_complete [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α) (k : ℕ)
-    (hk : ∃ w : Walk α, IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧ (w.length : ℕ∞) = k) :
-    Distance G root v ≤ k := by
+    (hk : ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧ (w.length : ℕ∞) = k) :
+    bfsAlgorithm.bfsDistance G root v ≤ k := by
   sorry
 
 theorem bfs_correct [Fintype α] (G : SimpleDiGraph α) (v₁ v₂ : α)
     (h₁ : v₁ ∈ G.vertexSet) :
-    Distance G v₁ v₂ = shortestPath G v₁ v₂ := by
+    bfsAlgorithm.bfsDistance G v₁ v₂ = Path.shortestPath G v₁ v₂ := by
   apply le_antisymm
   · -- Goal A: Distance G v₁ v₂ ≤ shortestPath G v₁ v₂
-    unfold shortestPath
+    unfold Path.shortestPath
     apply le_iInf; intro w
     apply le_iInf; intro ⟨hw_path, hw_head, hw_tail⟩
     exact bfs_complete G v₁ v₂ w.length ⟨w, hw_path, hw_head, hw_tail, rfl⟩
   · -- Goal B: shortestPath G v₁ v₂ ≤ Distance G v₁ v₂
-    unfold shortestPath
+    unfold Path.shortestPath
     sorry
+
+end bfsCorrectness
 
 -- #TODOs:
 -- 1. A theorem to show whether the definitions can find a shortest path in a graph

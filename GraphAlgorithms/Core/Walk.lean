@@ -172,6 +172,21 @@ namespace VertexSeq
     (h : v ∈ w.toList) : x ∈ (w.dropUntil v h).toList → x ∈ w.toList := by
   induction w generalizing v <;> grind
 
+/-- dropUntil preserves the Nodup property: a suffix of a duplicate-free sequence
+    is also duplicate-free. -/
+lemma dropUntil_toList_nodup [DecidableEq α] {w : VertexSeq α} {v : α} (h : v ∈ w.toList)
+    (hn : w.toList.Nodup) : (w.dropUntil v h).toList.Nodup := by
+  induction w generalizing v with
+  | singleton _ => simpa [dropUntil]
+  | cons w2 x ih =>
+    simp only [toList, List.nodup_cons] at hn
+    obtain ⟨hx, hn2⟩ := hn
+    unfold dropUntil
+    split_ifs with h2
+    · simp only [toList, List.nodup_cons]
+      exact ⟨fun hx' => hx (mem_dropUntil w2 v x h2 hx'), ih h2 hn2⟩
+    · simp [toList]
+
 @[grind] def loopErase [DecidableEq α] : VertexSeq α → VertexSeq α
   | .singleton v => .singleton v
   | .cons w v =>
@@ -196,6 +211,11 @@ theorem loopErase_nodup [DecidableEq α] (w : VertexSeq α) : w.loopErase.toList
 
 @[simp] lemma tail_loopErase [DecidableEq α] (w : VertexSeq α) : w.loopErase.tail = w.tail := by
   fun_induction loopErase w <;> simp_all
+
+lemma toList_length_eq (w : VertexSeq α) : w.toList.length = w.length + 1 := by
+  induction w with
+  | singleton v => simp [toList, length]
+  | cons w v ih => simp [toList, length, ih]; omega
 
 end VertexSeq
 
