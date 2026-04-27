@@ -11,7 +11,7 @@ public import Mathlib.Data.Real.Basic
 
 @[expose] public section
 
-variable {α : Type} [LinearOrder α]
+variable {α : Type}
 
 -- =========================================================================
 -- §1  Definitions
@@ -63,7 +63,7 @@ def Frame.attach (c : BinaryTree α) (f : Frame α) : BinaryTree α :=
 /-- Descend from `t` toward `q`, returning the subtree reached (either the
 matching node or `.empty` if `q` is absent) and the path above it. The head
 of the returned list is the deepest frame (parent of the returned subtree). -/
-def descend (t : BinaryTree α) (q : α) : BinaryTree α × List (Frame α) :=
+def descend [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α × List (Frame α) :=
   go t []
 where
   go : BinaryTree α → List (Frame α) → BinaryTree α × List (Frame α)
@@ -95,7 +95,7 @@ def splayUp : BinaryTree α → List (Frame α) → BinaryTree α
 
 /-- Bottom-up splay: the "textbook" splay analysed by Tarjan, Sundar, and
 Elmasry. If `q` is absent the last visited ancestor is splayed to the root. -/
-def splayBU (t : BinaryTree α) (q : α) : BinaryTree α :=
+def splayBU [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α :=
   match descend t q with
   | (.empty, []) => .empty
   | (.empty, f :: rest) => splayUp (f.attach .empty) rest
@@ -103,5 +103,5 @@ def splayBU (t : BinaryTree α) (q : α) : BinaryTree α :=
 
 /-- Cost of a bottom-up splay: one unit per rotation, i.e. the length of the
 search path. -/
-def splayBU.cost (t : BinaryTree α) (q : α) : ℝ :=
+def splayBU.cost [LinearOrder α] (t : BinaryTree α) (q : α) : ℝ :=
   (descend t q).2.length
