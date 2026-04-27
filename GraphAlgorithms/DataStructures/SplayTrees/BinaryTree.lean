@@ -9,13 +9,15 @@ module
 public import Mathlib.Combinatorics.SimpleGraph.Basic
 public import Mathlib.Combinatorics.SimpleGraph.Metric
 
+@[expose] public section
+
 /-!
 # Binary Tree
 
   In this file we introduce the `BinaryTree` data structure and its basic operations.
 -/
 
-variable {α : Type}
+variable {α : Type} [LinearOrder α]
 
 inductive BinaryTree (α) where
 | empty
@@ -30,6 +32,7 @@ def BinaryTree.right : BinaryTree α → BinaryTree α
   | .empty => .empty
   | .node _ _ r => r
 
+omit [LinearOrder α] in
 theorem non_empty_exist (s : BinaryTree α) (h : s ≠ BinaryTree.empty) :
 ∃ A k B, s = .node A k B :=
   by induction s <;> grind
@@ -38,7 +41,9 @@ def BinaryTree.num_nodes (α) : BinaryTree α → ℕ
 | .empty => 0
 | .node left _ right => 1 + (num_nodes α left) + (num_nodes α right)
 
+omit [LinearOrder α] in
 @[simp] lemma BinaryTree.num_nodes_empty : BinaryTree.empty.num_nodes α = 0 := rfl
+omit [LinearOrder α] in
 @[simp] lemma BinaryTree.num_nodes_node (l : BinaryTree α) (k : α) (r : BinaryTree α) :
     (BinaryTree.node l k r).num_nodes α = 1 + l.num_nodes α + r.num_nodes α := rfl
 
@@ -47,7 +52,9 @@ def BinaryTree.toKeyList (α) : BinaryTree α → List α
   | .empty => []
   | .node l k r => l.toKeyList α ++ [k] ++ r.toKeyList α
 
+omit [LinearOrder α] in
 @[simp] lemma BinaryTree.toKeyList_empty : BinaryTree.empty.toKeyList α = [] := rfl
+omit [LinearOrder α] in
 @[simp] lemma BinaryTree.toKeyList_node (l : BinaryTree α) (k : α) (r : BinaryTree α) :
     (BinaryTree.node l k r).toKeyList α = l.toKeyList α ++ [k] ++ r.toKeyList α := rfl
 
@@ -89,20 +96,20 @@ def BinaryTree.contains (α) [LinearOrder α] (t : BinaryTree α) (q : α) : Pro
 -- Simp lemmas for contains
 -- ============================================================
 
-@[simp] lemma BinaryTree.not_contains_empty {α} [LinearOrder α] (q : α) :
+@[simp] lemma BinaryTree.not_contains_empty (q : α) :
     ¬ BinaryTree.empty.contains α q := nofun
 
-@[simp] lemma BinaryTree.contains_node_lt {α} [LinearOrder α] {l : BinaryTree α} {k q : α}
+@[simp] lemma BinaryTree.contains_node_lt {l : BinaryTree α} {k q : α}
     {r : BinaryTree α} (h : q < k) :
     (BinaryTree.node l k r).contains α q ↔ l.contains α q := by
   simp [BinaryTree.contains, h]
 
-@[simp] lemma BinaryTree.contains_node_gt {α} [LinearOrder α] {l : BinaryTree α} {k q : α}
+@[simp] lemma BinaryTree.contains_node_gt {l : BinaryTree α} {k q : α}
     {r : BinaryTree α} (h : k < q) :
     (BinaryTree.node l k r).contains α q ↔ r.contains α q := by
   simp [BinaryTree.contains, h, not_lt_of_gt h]
 
-@[simp] lemma BinaryTree.contains_node_not_eq_not_lt {α} [LinearOrder α]
+@[simp] lemma BinaryTree.contains_node_not_eq_not_lt
     {l : BinaryTree α} {k q : α} {r : BinaryTree α}
     (h1 : ¬ q = k) (h2 : ¬ q < k) :
     (BinaryTree.node l k r).contains α q ↔ r.contains α q := by
@@ -129,14 +136,17 @@ inductive IsBST (α) [LinearOrder α] : BinaryTree α → Prop
 -- Accessor lemmas for ForallTree
 -- ============================================================
 
+omit [LinearOrder α] in
 @[simp] lemma ForallTree.left_sub {p : α → Prop} {l : BinaryTree α} {k : α} {r : BinaryTree α}
     (h : ForallTree p (.node l k r)) : ForallTree p l := by
   cases h with | node _ _ _ hl _ _ => exact hl
 
+omit [LinearOrder α] in
 @[simp] lemma ForallTree.root {p : α → Prop} {l : BinaryTree α} {k : α} {r : BinaryTree α}
     (h : ForallTree p (.node l k r)) : p k := by
   cases h with | node _ _ _ _ hk _ => exact hk
 
+omit [LinearOrder α] in
 @[simp] lemma ForallTree.right_sub {p : α → Prop} {l : BinaryTree α} {k : α} {r : BinaryTree α}
     (h : ForallTree p (.node l k r)) : ForallTree p r := by
   cases h with | node _ _ _ _ _ hr => exact hr
@@ -145,19 +155,19 @@ inductive IsBST (α) [LinearOrder α] : BinaryTree α → Prop
 -- Accessor lemmas for IsBST
 -- ============================================================
 
-@[simp] lemma IsBST.forallTree_left [LinearOrder α] {l : BinaryTree α} {k : α} {r : BinaryTree α}
+@[simp] lemma IsBST.forallTree_left {l : BinaryTree α} {k : α} {r : BinaryTree α}
     (h : IsBST α (.node l k r)) : ForallTree (· < k) l := by
   cases h with | node _ _ _ hl _ _ _ => exact hl
 
-@[simp] lemma IsBST.forallTree_right [LinearOrder α] {l : BinaryTree α} {k : α} {r : BinaryTree α}
+@[simp] lemma IsBST.forallTree_right {l : BinaryTree α} {k : α} {r : BinaryTree α}
     (h : IsBST α (.node l k r)) : ForallTree (k < ·) r := by
   cases h with | node _ _ _ _ hr _ _ => exact hr
 
-@[simp] lemma IsBST.left_bst [LinearOrder α] {l : BinaryTree α} {k : α} {r : BinaryTree α}
+@[simp] lemma IsBST.left_bst {l : BinaryTree α} {k : α} {r : BinaryTree α}
     (h : IsBST α (.node l k r)) : IsBST α l := by
   cases h with | node _ _ _ _ _ hl _ => exact hl
 
-@[simp] lemma IsBST.right_bst [LinearOrder α] {l : BinaryTree α} {k : α} {r : BinaryTree α}
+@[simp] lemma IsBST.right_bst {l : BinaryTree α} {k : α} {r : BinaryTree α}
     (h : IsBST α (.node l k r)) : IsBST α r := by
   cases h with | node _ _ _ _ _ _ hr => exact hr
 
