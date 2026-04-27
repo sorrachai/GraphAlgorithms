@@ -129,4 +129,42 @@ lemma deg_norm_eq_sum_reg (G : SimpleGraph α) (x : α → ℝ) (d : ℕ)
   intro v hv
   rw [h_reg v hv]
 
+lemma rQ_eq_energy_div_norm (G : SimpleGraph α) (x : α → ℝ) :
+    G.rayleighQuotient x = G.energy x / G.deg_norm x := by
+  unfold rayleighQuotient
+  rfl
+
+/-- Symmetry of the cut: The number of edges crossing from S to its complement
+    is the same as from the complement to S. -/
+lemma cutSize_symm (G : SimpleGraph α) (S : Finset α) :
+    (Cut G S).card = (Cut G (V(G) \ S)).card := by
+  -- Use the library property that Cut G S = Cut G Sᶜ
+  -- rw [Cut_complement]
+  sorry
+
+/-- In a d-regular graph, if |S| ≤ n/2, the expansion of the complement
+    is at most the expansion of S. -/
+lemma edgeExpansion_complement (G : SimpleGraph α) (d : ℕ) (S : Finset α)
+    (hS : S ⊆ V(G)) (h_size : 2 * S.card ≤ (V(G)).card) (h_d : 0 < d) :
+    edgeExpansion G d (V(G) \ S) ≤ edgeExpansion G d S := by
+  unfold edgeExpansion
+  -- 1. Numerators are equal: |Cut(S)| = |Cut(Sᶜ)|
+  have h_num : (Cut G S).card = (Cut G (V(G) \ S)).card := by
+    -- Edges crossing the boundary are the same for S and its complement
+    -- rw [Cut_complement]
+    sorry
+  rw [h_num]
+  -- 2. Denominators: d * |V \ S| ≥ d * |S|
+  apply div_le_div_of_nonneg_left
+  · exact Nat.cast_nonneg _
+  · apply mul_pos
+    norm_cast
+    -- Since S ⊆ V and 2|S| ≤ |V|, |V \ S| ≥ |S|. If S is non-empty, |V \ S| > 0.
+    sorry
+  · gcongr
+    -- simp only [Nat.cast_le]
+    -- Since 2 * |S| ≤ |V|, |S| ≤ |V| - |S| = |V \ S|
+    -- omega
+    sorry
+
 end SimpleGraph
