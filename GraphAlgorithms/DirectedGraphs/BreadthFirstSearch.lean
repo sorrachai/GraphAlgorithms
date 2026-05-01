@@ -134,42 +134,115 @@ noncomputable def shortestPath [Fintype α] (G : SimpleDiGraph α) (v₁ : α) (
      in ℕ∞ gives ⊤ (infinity) automatically. -/
   ⨅ (w : Walk α) (_ : IsPathIn G w ∧ w.head = v₁ ∧ w.tail = v₂), (w.length : ℕ∞)
 
-/-- Lemma 22.1 in CLRS: the triangle inequality for shortest paths.
-    ∀ s ∈ V(G), ∀ (u, v) ∈ E(G), shortestPath G s v ≤ shortestPath G s u + 1 -/
-lemma shortestPath_triangle_inequality [Fintype α] (G : SimpleDiGraph α) (s u v : α)
-    (h_su : shortestPath G s u ≠ ⊤) (h_uv : (u, v) ∈ E(G)) :
-    shortestPath G s v ≤ shortestPath G s u + 1 := by
-  sorry
+-- /-- Lemma 22.1 in CLRS: the triangle inequality for shortest paths.
+--     ∀ s ∈ V(G), ∀ (u, v) ∈ E(G), shortestPath G s v ≤ shortestPath G s u + 1 -/
+-- lemma shortestPath_triangle_inequality [Fintype α] (G : SimpleDiGraph α) (s u v : α)
+--     (h_su : shortestPath G s u ≠ ⊤) (h_uv : (u, v) ∈ E(G)) :
+--     shortestPath G s v ≤ shortestPath G s u + 1 := by
+--   sorry
 
 end Path
 
 
 namespace bfsCorrectness
 
-/-- Lemma 22.2 in CLRS: BFS bounds the shortest path.
-    Suppose that BFS is run on G from a given source vertex s ∈ V.
-    Then upon termination, ∀ v ∈ V, the distance computed by BFS satisfies:
-    bfsDistances G s v ≥ shortestPath G s v -/
-lemma bfs_bounds_shortest_path [Fintype α] (G : SimpleDiGraph α) (s v : α)
-    (h_s : s ∈ G.vertexSet) :
-    bfsAlgorithm.bfsDistances G s v ≥ Path.shortestPath G s v := by
-  sorry
+-- /-- Lemma 22.2 in CLRS: BFS bounds the shortest path.
+--     Suppose that BFS is run on G from a given source vertex s ∈ V.
+--     Then upon termination, ∀ v ∈ V, the distance computed by BFS satisfies:
+--     bfsDistances G s v ≥ shortestPath G s v -/
+-- lemma bfs_bounds_shortest_path [Fintype α] (G : SimpleDiGraph α) (s v : α)
+--     (h_s : s ∈ G.vertexSet) :
+--     bfsAlgorithm.bfsDistances G s v ≥ Path.shortestPath G s v := by
+--   sorry
 
-/-- Lemma 22.3 in CLRS: During the execution of BFS on a graph G,
-    the `frontier` contains the vertices {v₁, ..., vᵣ}, where v₁ is the head and vᵣ is the tail.
-    Then dist' vᵣ ≤ dist' v₁ + 1. -/
-lemma bfs_triangle_inequality [Fintype α] (G : SimpleDiGraph α) (root : α) (v₁ v₂ : α)
-    (h_root : root ∈ G.vertexSet) :
-    bfsAlgorithm.bfsDistances G root v₂ ≤ bfsAlgorithm.bfsDistances G root v₁ + 1 := by
-  sorry
+-- /-- Lemma 22.3 in CLRS: During the execution of BFS on a graph G,
+--     the `frontier` contains the vertices {v₁, ..., vᵣ}, where v₁ is the head and vᵣ is the tail.
+--     Then dist' vᵣ ≤ dist' v₁ + 1. -/
+-- lemma bfs_triangle_inequality [Fintype α] (G : SimpleDiGraph α) (root : α) (v₁ v₂ : α)
+--     (h_root : root ∈ G.vertexSet) :
+--     bfsAlgorithm.bfsDistances G root v₂ ≤ bfsAlgorithm.bfsDistances G root v₁ + 1 := by
+--   sorry
 
-/-- Corollary 22.4 in CLRS: For vertices vᵢ and vⱼ are enqueued during the execution of BFS,
-    and that vᵢ is enqueued before vⱼ. Then dist' vᵢ ≤ dist' vⱼ at the time that vⱼ is enqueued.
-    * This turns out a tautology in our implementation. -/
-lemma bfs_enqueue_order [Fintype α] (G : SimpleDiGraph α) (root : α) (vᵢ vⱼ : α)
-    (h_root : root ∈ G.vertexSet)
-    (h_enqueue : bfsAlgorithm.bfsDistances G root vᵢ ≤ bfsAlgorithm.bfsDistances G root vⱼ) :
-    bfsAlgorithm.bfsDistances G root vᵢ ≤ bfsAlgorithm.bfsDistances G root vⱼ := by
+-- /-- Corollary 22.4 in CLRS: For vertices vᵢ and vⱼ are enqueued during the execution of BFS,
+--     and that vᵢ is enqueued before vⱼ. Then dist' vᵢ ≤ dist' vⱼ at the time that vⱼ is enqueued.
+--     * This turns out a tautology in our implementation. -/
+-- lemma bfs_enqueue_order [Fintype α] (G : SimpleDiGraph α) (root : α) (vᵢ vⱼ : α)
+--     (h_root : root ∈ G.vertexSet)
+--     (h_enqueue : bfsAlgorithm.bfsDistances G root vᵢ ≤ bfsAlgorithm.bfsDistances G root vⱼ) :
+--     bfsAlgorithm.bfsDistances G root vᵢ ≤ bfsAlgorithm.bfsDistances G root vⱼ := by
+--   sorry
+
+/-- Helper lemma to prove `bfs_complete_aux`:
+    Once a vertex is in `visited` and not in the current frontier,
+    BFS never changes its recorded distance. -/
+lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
+    (n : ℕ) (visited frontier : Finset α) (d : ℕ) (dist : α → ℕ∞)
+    (v : α) (hv_vis : v ∈ visited) (hv_fron : v ∉ frontier) :
+    bfsAlgorithm.bfs G n visited frontier d dist v = dist v := by
+  induction n generalizing visited frontier d dist with
+  | zero => simp [bfsAlgorithm.bfs]
+  | succ n ih =>
+    simp only [bfsAlgorithm.bfs]
+    split_ifs with h_empty
+    · -- frontier = ∅: bfs returns dist unchanged
+      rfl
+    · -- frontier ≠ ∅: record dist', compute next, recurse
+      set dist' := fun u => if u ∈ frontier then (d : ℕ∞) else dist u
+      set next  := (Finset.biUnion frontier (fun u ↦ N⁺(G, u))) \ visited
+      -- v ∉ next because next ⊆ complement of visited, but v ∈ visited
+      have hv_not_next : v ∉ next :=
+        fun h => (Finset.mem_sdiff.mp h).2 hv_vis
+      -- Apply IH: v ∈ visited ∪ next (from hv_vis), v ∉ next (proved above)
+      rw [ih (visited ∪ next) next (d + 1) dist' (Finset.mem_union_left _ hv_vis) hv_not_next]
+      simp [dist', if_neg hv_fron]
+
+/-- Helper lemma to prove `bfs_complete`:
+    If a path of length k from root to v exists avoiding all vertices in visited,
+    then after k more BFS rounds, v will appear in dist with value ≤ d + k. -/
+lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
+    (n : ℕ) (visited frontier : Finset α) (d : ℕ) (init_dist : α → ℕ∞)
+    (w : Walk α) (hw : Path.IsPathIn G w) (hw_head : w.head ∈ frontier)
+    (hw_tail : w.tail = v) (hw_avoid : ∀ x ∈ w.support, x ≠ w.head → x ∉ visited)
+    (hfv : frontier ⊆ visited)
+    (hn : w.length < n) :
+    bfsAlgorithm.bfs G n visited frontier d init_dist v ≤ d + w.length := by
+  induction n generalizing visited frontier d init_dist w with
+  | zero => exact absurd hn (Nat.not_lt_zero _)
+  | succ n ih =>
+    simp only [bfsAlgorithm.bfs]
+    split_ifs with h_empty
+    · -- frontier = ∅: contradicts hw_head
+      simp [h_empty] at hw_head
+    · -- frontier ≠ ∅
+      set dist' := fun u => if u ∈ frontier then (d : ℕ∞) else init_dist u
+      set next  := (Finset.biUnion frontier (fun u ↦ N⁺(G, u))) \ visited
+      -- Case split on walk length
+      rcases Nat.eq_zero_or_pos w.length with h_len | h_len
+      · -- w.length = 0, so w is a trivial walk, v = w.head ∈ frontier
+        -- v gets distance d from dist', then bfs_stable keeps it
+        have hv_front : v ∈ frontier :=
+          hw_tail ▸ (Walk.head_eq_tail_of_length_zero w h_len ▸ hw_head)
+          -- Alternatively, in tactic mode:
+          -- by have h_eq := Walk.head_eq_tail_of_length_zero w h_len  -- w.head = w.tail
+          -- rw [← hw_tail, ← h_eq]; exact hw_head
+        have hv_vis : v ∈ visited := hfv hv_front
+        have hv_not_next : v ∉ next := fun h => (Finset.mem_sdiff.mp h).2 hv_vis
+        rw [bfs_stable G n (visited ∪ next) next (d + 1) dist' v
+              (Finset.mem_union_left _ hv_vis) hv_not_next]
+        simp only [dist', if_pos hv_front]
+        simp [h_len]
+      · -- w.length = k + 1, decompose walk
+        -- get the second vertex in the support (index 1) and split the walk there
+        have h_support_len : w.support.length = w.length + 1 := by
+          simp [Walk.support, VertexSeq.toList_length_eq]
+        sorry
+
+/-- Sub Goal A for `bfs_correct`:
+    If a path of length `k` exists from `root` vertex to `v` in `G`,
+    then BFS returns `distance ≤ k` for `v`. -/
+lemma bfs_complete [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α) (k : ℕ)
+    (hk : ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧ (w.length : ℕ∞) = k) :
+    bfsAlgorithm.bfsDistance G root v ≤ k := by
   sorry
 
 /-- Sub Goal B for `bfs_correct`:
@@ -253,79 +326,6 @@ lemma bfs_sound [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α)
           · exact Finset.mem_union_right _ hu_in_next
           · exact Finset.mem_union_left _ (hw_supp x hx)
       · simp only [h_empty] at hv; exact hv
-
-/-- Helper lemma to prove `bfs_complete_aux`:
-    Once a vertex is in `visited` and not in the current frontier,
-    BFS never changes its recorded distance. -/
-lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
-    (n : ℕ) (visited frontier : Finset α) (d : ℕ) (dist : α → ℕ∞)
-    (v : α) (hv_vis : v ∈ visited) (hv_fron : v ∉ frontier) :
-    bfsAlgorithm.bfs G n visited frontier d dist v = dist v := by
-  induction n generalizing visited frontier d dist with
-  | zero => simp [bfsAlgorithm.bfs]
-  | succ n ih =>
-    simp only [bfsAlgorithm.bfs]
-    split_ifs with h_empty
-    · -- frontier = ∅: bfs returns dist unchanged
-      rfl
-    · -- frontier ≠ ∅: record dist', compute next, recurse
-      set dist' := fun u => if u ∈ frontier then (d : ℕ∞) else dist u
-      set next  := (Finset.biUnion frontier (fun u ↦ N⁺(G, u))) \ visited
-      -- v ∉ next because next ⊆ complement of visited, but v ∈ visited
-      have hv_not_next : v ∉ next :=
-        fun h => (Finset.mem_sdiff.mp h).2 hv_vis
-      -- Apply IH: v ∈ visited ∪ next (from hv_vis), v ∉ next (proved above)
-      rw [ih (visited ∪ next) next (d + 1) dist' (Finset.mem_union_left _ hv_vis) hv_not_next]
-      simp [dist', if_neg hv_fron]
-
-/-- Helper lemma to prove `bfs_complete`:
-    If a path of length k from root to v exists avoiding all vertices in visited,
-    then after k more BFS rounds, v will appear in dist with value ≤ d + k. -/
-lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
-    (n : ℕ) (visited frontier : Finset α) (d : ℕ) (init_dist : α → ℕ∞)
-    (w : Walk α) (hw : Path.IsPathIn G w) (hw_head : w.head ∈ frontier)
-    (hw_tail : w.tail = v) (hw_avoid : ∀ x ∈ w.support, x ∉ visited \ frontier)
-    (hfv : frontier ⊆ visited)
-    (hn : w.length < n) :
-    bfsAlgorithm.bfs G n visited frontier d init_dist v ≤ d + w.length := by
-  induction n generalizing visited frontier d init_dist w with
-  | zero => exact absurd hn (Nat.not_lt_zero _)
-  | succ n ih =>
-    simp only [bfsAlgorithm.bfs]
-    split_ifs with h_empty
-    · -- frontier = ∅: contradicts hw_head
-      simp [h_empty] at hw_head
-    · -- frontier ≠ ∅
-      set dist' := fun u => if u ∈ frontier then (d : ℕ∞) else init_dist u
-      set next  := (Finset.biUnion frontier (fun u ↦ N⁺(G, u))) \ visited
-      -- Case split on walk length
-      rcases Nat.eq_zero_or_pos w.length with h_len | h_len
-      · -- w.length = 0, so w is a trivial walk, v = w.head ∈ frontier
-        -- v gets distance d from dist', then bfs_stable keeps it
-        have hv_front : v ∈ frontier :=
-          hw_tail ▸ (Walk.head_eq_tail_of_length_zero w h_len ▸ hw_head)
-          -- Alternatively, in tactic mode:
-          -- by have h_eq := Walk.head_eq_tail_of_length_zero w h_len  -- w.head = w.tail
-          -- rw [← hw_tail, ← h_eq]; exact hw_head
-        have hv_vis : v ∈ visited := hfv hv_front
-        have hv_not_next : v ∉ next := fun h => (Finset.mem_sdiff.mp h).2 hv_vis
-        rw [bfs_stable G n (visited ∪ next) next (d + 1) dist' v
-              (Finset.mem_union_left _ hv_vis) hv_not_next]
-        simp only [dist', if_pos hv_front]
-        simp [h_len]
-      · -- w.length = k + 1, decompose walk
-        -- get the second vertex in the support (index 1) and split the walk there
-        have h_support_len : w.support.length = w.length + 1 := by
-          simp [Walk.support, VertexSeq.toList_length_eq]
-        sorry
-
-/-- Sub Goal A for `bfs_correct`:
-    If a path of length `k` exists from `root` vertex to `v` in `G`,
-    then BFS returns `distance ≤ k` for `v`. -/
-lemma bfs_complete [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α) (k : ℕ)
-    (hk : ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧ (w.length : ℕ∞) = k) :
-    bfsAlgorithm.bfsDistance G root v ≤ k := by
-  sorry
 
 theorem bfs_correct [Fintype α] (G : SimpleDiGraph α) (v₁ v₂ : α)
     (h₁ : v₁ ∈ G.vertexSet) :
