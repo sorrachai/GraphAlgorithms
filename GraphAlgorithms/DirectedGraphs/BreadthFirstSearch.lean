@@ -217,7 +217,7 @@ private lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
 omit [DecidableEq α] in
 /-- Helper lemma to prove `bfs_complete_aux`:
     A walk of positive length in G has a first outgoing edge from its head. -/
-private lemma isWalkIn_first_edge
+lemma isWalkIn_first_edge
     (G : SimpleDiGraph α) (w : Walk α)
     (hw : Walk.IsWalkIn G w) (hlen : w.length > 0) :
     ∃ a₁ ∈ w.support, a₁ ≠ w.head ∧ (w.head, a₁) ∈ G.edgeSet := by
@@ -243,7 +243,7 @@ private lemma isWalkIn_first_edge
 omit [DecidableEq α] in
 /-- Helper lemma to prove `bfs_complete_aux`:
     The last element of w.toList is w.head. -/
-private lemma vertexSeq_toList_getLast (w : VertexSeq α) (h : w.toList ≠ []) :
+lemma vertexSeq_toList_getLast (w : VertexSeq α) (h : w.toList ≠ []) :
     w.toList.getLast h = w.head := by
   induction w with
   | singleton v => simp [VertexSeq.toList, VertexSeq.head]
@@ -252,10 +252,10 @@ private lemma vertexSeq_toList_getLast (w : VertexSeq α) (h : w.toList ≠ []) 
       rw [List.getLast_cons (by simp; induction p <;> simp [VertexSeq.toList])]
       exact ih (by simp; induction p <;> simp [VertexSeq.toList])
 
-/-- Helper lemma to prove `bfs_complete`:
+/-- Helper theorem to prove `bfs_complete`:
     If a simple path of length k ending at v exists whose head lies in frontier
     and whose non-head vertices avoid visited, then BFS records v with distance ≤ d + k. -/
-private lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (v : α)
+theorem bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (v : α)
     (n : ℕ) (visited frontier : Finset α) (d : ℕ) (init_dist : α → ℕ∞)
     (w : Walk α) (hw : Path.IsPathIn G w) (hw_head : w.head ∈ frontier)
     (hw_tail : w.tail = v) (hw_avoid : ∀ x ∈ w.support, x ≠ w.head → x ∉ visited)
@@ -422,7 +422,8 @@ private lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (v : α)
 /-- Sub Goal A for `bfs_correct`:
     If a path of length `k` exists from `root` vertex to `v` in `G`,
     then BFS returns `distance ≤ k` for `v`. -/
-lemma bfs_complete [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α) (k : ℕ)
+@[simp]
+theorem bfs_complete [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α) (k : ℕ)
     (hk : ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧ (w.length : ℕ∞) = k) :
     bfsAlgorithm.bfsDistance G root v ≤ k := by
   obtain ⟨w, hw, hw_head, hw_tail, hw_len⟩ := hk
@@ -451,7 +452,8 @@ lemma bfs_complete [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α) (k :
 /-- Sub Goal B for `bfs_correct`:
     If `bfs G n visited frontier d dist v` = k,
     then there exists a valid path in `G` from `root` vertex to `v` of `length k`. -/
-lemma bfs_sound [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α)
+@[simp]
+theorem bfs_sound [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α)
     (n : ℕ) (visited frontier : Finset α) (d : ℕ) (init_dist : α → ℕ∞)
     -- INV-1: every distance already in `init_dist` corresponds to a real path from `root`
     (h_dist : ∀ v : α, init_dist v ≠ ⊤ →
@@ -541,7 +543,27 @@ theorem bfs_correct [Fintype α] (G : SimpleDiGraph α) (v₁ v₂ : α)
     exact bfs_complete G v₁ v₂ w.length ⟨w, hw_path, hw_head, hw_tail, rfl⟩
   · -- Goal B: shortestPath G v₁ v₂ ≤ Distance G v₁ v₂
     unfold Path.shortestPath
-    sorry
+    by_cases hv : bfsAlgorithm.bfsDistance G v₁ v₂ = ⊤
+    · rw [hv]; exact le_top
+    · simp only [bfsAlgorithm.bfsDistance, bfsAlgorithm.bfsDistances] at hv ⊢
+      obtain ⟨w, hw_path, hw_head, hw_tail, hw_len⟩ :=
+        bfs_sound G v₁ v₂ (Fintype.card α) {v₁} {v₁} 0 (fun _ => ⊤)
+          -- h_dist: init_dist = ⊤ everywhere, so hypothesis is vacuous
+          (fun u hu => absurd rfl hu)
+          -- h_front: singleton walk v₁ → v₁ of length 0
+          (fun u hu => ⟨
+            ⟨.singleton v₁, .singleton v₁⟩,
+            ⟨IsWalkIn.singleton v₁ h₁,
+              by simp [Walk.IsPath, Walk.support, VertexSeq.toList]⟩,
+            rfl,
+            (Finset.mem_singleton.mp hu).symm,
+            by simp [Walk.length, VertexSeq.length],
+            fun x hx => by
+              simp only [support, VertexSeq.toList, List.mem_cons, List.not_mem_nil, or_false] at hx
+              exact Finset.mem_singleton.mpr hx
+          ⟩)
+          hv
+      exact iInf_le_of_le w (iInf_le_of_le ⟨hw_path, hw_head, hw_tail⟩ (le_of_eq hw_len))
 
 end bfsCorrectness
 
