@@ -4,10 +4,10 @@ import Mathlib.Data.Sym.Sym2
 import Mathlib.Data.Finset.Basic
 
 import GraphAlgorithms.DirectedGraphs.SimpleDiGraphs
-import GraphAlgorithms.DirectedGraphs.Walk
+import GraphAlgorithms.DirectedGraphs.Walk  -- already incl. GraphAlgorithms.Core.Walk
 
 -- Breadth-first Search
--- Authors: Huang, JiangYi
+-- Author: Huang, JiangYi (nnhjy <43530784+nnhjy@users.noreply.github.com>);
 
 set_option tactic.hygienic false
 variable {α : Type*} [DecidableEq α]
@@ -143,25 +143,6 @@ noncomputable def shortestPath [Fintype α] (G : SimpleDiGraph α) (v₁ : α) (
 
 end Path
 
-
-omit [DecidableEq α] in
-/-- Helper lemma to prove `bfs_complete_aux`: -/
-private lemma dropUntil_length_lt_of_ne_head [DecidableEq α]
-    {w : VertexSeq α} {v : α} (h : v ∈ w.toList) (hne : v ≠ w.head) :
-    (w.dropUntil v h).length < w.length := by
-  induction w with
-  | singleton x =>
-    simp only [VertexSeq.toList, List.mem_cons, List.not_mem_nil, or_false] at h
-    exact absurd (h ▸ rfl) hne
-  | cons w2 x ih =>
-    simp only [VertexSeq.head] at hne
-    unfold VertexSeq.dropUntil
-    split_ifs with h2
-    · simp only [VertexSeq.length]
-      have := ih h2 hne
-      omega
-    · simp [VertexSeq.length]
-
 namespace bfsCorrectness
 
 -- /-- Lemma 22.2 in CLRS: BFS bounds the shortest path.
@@ -213,44 +194,6 @@ private lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
       -- Apply IH: v ∈ visited ∪ next (from hv_vis), v ∉ next (proved above)
       rw [ih (visited ∪ next) next (d + 1) dist' (Finset.mem_union_left _ hv_vis) hv_not_next]
       simp [dist', if_neg hv_fron]
-
-omit [DecidableEq α] in
-/-- Helper lemma to prove `bfs_complete_aux`:
-    A walk of positive length in G has a first outgoing edge from its head. -/
-lemma isWalkIn_first_edge
-    (G : SimpleDiGraph α) (w : Walk α)
-    (hw : Walk.IsWalkIn G w) (hlen : w.length > 0) :
-    ∃ a₁ ∈ w.support, a₁ ≠ w.head ∧ (w.head, a₁) ∈ G.edgeSet := by
-  induction hw with
-  | singleton v hv => exact absurd hlen (by grind [VertexSeq.length])
-  | cons w' u' hw_inner hedg ih =>
-      by_cases h' : w'.length = 0
-      · -- w' is a singleton: w'.head = w'.tail, direct edge (w.head, u')
-        have heq : w'.head = w'.tail := Walk.head_eq_tail_of_length_zero w' h'
-        exact ⟨u',
-          by simp [Walk.support, Walk.append_single, VertexSeq.toList],
-          (G.loopless _ (heq ▸ hedg)).symm,
-          heq ▸ hedg⟩
-      · -- w'.length > 0: IH gives first edge of w', lift membership to w
-        -- ih : w'.length > 0 → ∃ a₁ ∈ w'.support, a₁ ≠ w'.head ∧ (w'.head, a₁) ∈ G.edgeSet
-        obtain ⟨a₁, ha₁_supp, ha₁_neq, ha₁_edge⟩ := ih (Nat.pos_of_ne_zero h')
-        exact ⟨a₁,
-          by simp only [support, append_single, VertexSeq.toList, List.mem_cons];
-              exact Or.inr ha₁_supp,
-          ha₁_neq,
-          ha₁_edge⟩
-
-omit [DecidableEq α] in
-/-- Helper lemma to prove `bfs_complete_aux`:
-    The last element of w.toList is w.head. -/
-lemma vertexSeq_toList_getLast (w : VertexSeq α) (h : w.toList ≠ []) :
-    w.toList.getLast h = w.head := by
-  induction w with
-  | singleton v => simp [VertexSeq.toList, VertexSeq.head]
-  | cons p u ih =>
-      simp only [VertexSeq.toList, VertexSeq.head]
-      rw [List.getLast_cons (by simp; induction p <;> simp [VertexSeq.toList])]
-      exact ih (by simp; induction p <;> simp [VertexSeq.toList])
 
 /-- Helper theorem to prove `bfs_complete`:
     If a simple path of length k ending at v exists whose head lies in frontier
@@ -310,7 +253,7 @@ theorem bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (v : α)
         have ha₁_in_dropLast : a₁ ∈ w.support.dropLast := by
           apply List.mem_dropLast_of_mem_of_ne_getLast ha₁_supp
           have : w.support.getLast (List.ne_nil_of_mem ha₁_supp) = w.head :=
-            vertexSeq_toList_getLast w.seq (List.ne_nil_of_mem ha₁_supp)
+            VertexSeq.toList_getLast_is_head w.seq (List.ne_nil_of_mem ha₁_supp)
           rw [this]
           exact ha₁_neq
         -- find?_isSome (available as @[simp]) to obtain the form ∃ x, x ∈ xs ∧ p x
@@ -337,7 +280,7 @@ theorem bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (v : α)
           simp only [w', Walk.tail]; rw [VertexSeq.tail_dropUntil]; exact hw_tail
         have hw'_path : Path.IsPathIn G w' := Path.IsPathIn.suffix G w u hu_supp hw
         have hw'_lt_w : w'.length < w.length :=
-          dropUntil_length_lt_of_ne_head hu_supp hu_ne_hd
+          VertexSeq.dropUntil_length_lt_of_ne_head hu_supp hu_ne_hd
         have hw'_len_lt : w'.length < n := by omega
         have hw'_avoid : ∀ x ∈ w'.support, x ≠ w'.head → x ∉ visited ∪ next := by
           intro x hx hxu
@@ -358,7 +301,7 @@ theorem bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (v : α)
           have hxu_val : x ≠ u := hw'_head ▸ hxu
           -- u = getLast w'.support
           have hu_last : w'.support.getLast (List.ne_nil_of_mem hx) = u := by
-            simp only [Walk.support, vertexSeq_toList_getLast]
+            simp only [Walk.support, VertexSeq.toList_getLast_is_head]
             exact hw'_head
           -- x ∈ w'.support.dropLast
           have hx_dL : x ∈ w'.support.dropLast := by

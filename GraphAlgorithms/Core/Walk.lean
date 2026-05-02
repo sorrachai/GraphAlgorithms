@@ -187,6 +187,27 @@ lemma dropUntil_toList_nodup [DecidableEq α] {w : VertexSeq α} {v : α} (h : v
       exact ⟨fun hx' => hx (mem_dropUntil w2 v x h2 hx'), ih h2 hn2⟩
     · simp [toList]
 
+/-- If v appears in a VertexSeq w but is not its head,
+    then the dropUntil v sub-sequence is strictly shorter than w.
+    Usage:
+    - Helper lemma to prove `BreadFirstSearch.bfs_complete_aux` -/
+lemma dropUntil_length_lt_of_ne_head [DecidableEq α]
+    {w : VertexSeq α} {v : α} (h : v ∈ w.toList) (hne : v ≠ w.head) :
+    (w.dropUntil v h).length < w.length := by
+  induction w with
+  | singleton x =>
+    simp only [VertexSeq.toList, List.mem_cons, List.not_mem_nil, or_false] at h
+    exact absurd (h ▸ rfl) hne
+  | cons w2 x ih =>
+    simp only [VertexSeq.head] at hne
+    unfold VertexSeq.dropUntil
+    split_ifs with h2
+    · simp only [VertexSeq.length]
+      have := ih h2 hne
+      omega
+    · simp only [VertexSeq.length]
+      exact Nat.pos_of_neZero (1 + w2.length)
+
 @[grind] def loopErase [DecidableEq α] : VertexSeq α → VertexSeq α
   | .singleton v => .singleton v
   | .cons w v =>
@@ -216,6 +237,18 @@ lemma toList_length_eq (w : VertexSeq α) : w.toList.length = w.length + 1 := by
   induction w with
   | singleton v => simp [toList, length]
   | cons w v ih => simp [toList, length, ih]; omega
+
+/-- The last element of w.toList is w.head.
+    Usage:
+    - Helper lemma to prove `BreadFirstSearch.bfs_complete_aux` -/
+lemma toList_getLast_is_head (w : VertexSeq α) (h : w.toList ≠ []) :
+    w.toList.getLast h = w.head := by
+  induction w with
+  | singleton v => simp [VertexSeq.toList, VertexSeq.head]
+  | cons p u ih =>
+      simp only [VertexSeq.toList, VertexSeq.head]
+      rw [List.getLast_cons (by simp; induction p <;> simp [VertexSeq.toList])]
+      exact ih (by simp; induction p <;> simp [VertexSeq.toList])
 
 end VertexSeq
 
