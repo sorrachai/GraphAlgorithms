@@ -144,6 +144,24 @@ noncomputable def shortestPath [Fintype α] (G : SimpleDiGraph α) (v₁ : α) (
 end Path
 
 
+omit [DecidableEq α] in
+/-- Helper lemma to prove `bfs_complete_aux`: -/
+private lemma dropUntil_length_lt_of_ne_head [DecidableEq α]
+    {w : VertexSeq α} {v : α} (h : v ∈ w.toList) (hne : v ≠ w.head) :
+    (w.dropUntil v h).length < w.length := by
+  induction w with
+  | singleton x =>
+    simp only [VertexSeq.toList, List.mem_cons, List.not_mem_nil, or_false] at h
+    exact absurd (h ▸ rfl) hne
+  | cons w2 x ih =>
+    simp only [VertexSeq.head] at hne
+    unfold VertexSeq.dropUntil
+    split_ifs with h2
+    · simp only [VertexSeq.length]
+      have := ih h2 hne
+      omega
+    · simp [VertexSeq.length]
+
 namespace bfsCorrectness
 
 -- /-- Lemma 22.2 in CLRS: BFS bounds the shortest path.
@@ -175,7 +193,7 @@ namespace bfsCorrectness
 /-- Helper lemma to prove `bfs_complete_aux`:
     Once a vertex is in `visited` and not in the current frontier,
     BFS never changes its recorded distance. -/
-lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
+private lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
     (n : ℕ) (visited frontier : Finset α) (d : ℕ) (dist : α → ℕ∞)
     (v : α) (hv_vis : v ∈ visited) (hv_fron : v ∉ frontier) :
     bfsAlgorithm.bfs G n visited frontier d dist v = dist v := by
@@ -196,10 +214,48 @@ lemma bfs_stable [Fintype α] (G : SimpleDiGraph α)
       rw [ih (visited ∪ next) next (d + 1) dist' (Finset.mem_union_left _ hv_vis) hv_not_next]
       simp [dist', if_neg hv_fron]
 
+omit [DecidableEq α] in
+/-- Helper lemma to prove `bfs_complete_aux`:
+    A walk of positive length in G has a first outgoing edge from its head. -/
+private lemma isWalkIn_first_edge
+    (G : SimpleDiGraph α) (w : Walk α)
+    (hw : Walk.IsWalkIn G w) (hlen : w.length > 0) :
+    ∃ a₁ ∈ w.support, a₁ ≠ w.head ∧ (w.head, a₁) ∈ G.edgeSet := by
+  induction hw with
+  | singleton v hv => exact absurd hlen (by grind [VertexSeq.length])
+  | cons w' u' hw_inner hedg ih =>
+      by_cases h' : w'.length = 0
+      · -- w' is a singleton: w'.head = w'.tail, direct edge (w.head, u')
+        have heq : w'.head = w'.tail := Walk.head_eq_tail_of_length_zero w' h'
+        exact ⟨u',
+          by simp [Walk.support, Walk.append_single, VertexSeq.toList],
+          (G.loopless _ (heq ▸ hedg)).symm,
+          heq ▸ hedg⟩
+      · -- w'.length > 0: IH gives first edge of w', lift membership to w
+        -- ih : w'.length > 0 → ∃ a₁ ∈ w'.support, a₁ ≠ w'.head ∧ (w'.head, a₁) ∈ G.edgeSet
+        obtain ⟨a₁, ha₁_supp, ha₁_neq, ha₁_edge⟩ := ih (Nat.pos_of_ne_zero h')
+        exact ⟨a₁,
+          by simp only [support, append_single, VertexSeq.toList, List.mem_cons];
+              exact Or.inr ha₁_supp,
+          ha₁_neq,
+          ha₁_edge⟩
+
+omit [DecidableEq α] in
+/-- Helper lemma to prove `bfs_complete_aux`:
+    The last element of w.toList is w.head. -/
+private lemma vertexSeq_toList_getLast (w : VertexSeq α) (h : w.toList ≠ []) :
+    w.toList.getLast h = w.head := by
+  induction w with
+  | singleton v => simp [VertexSeq.toList, VertexSeq.head]
+  | cons p u ih =>
+      simp only [VertexSeq.toList, VertexSeq.head]
+      rw [List.getLast_cons (by simp; induction p <;> simp [VertexSeq.toList])]
+      exact ih (by simp; induction p <;> simp [VertexSeq.toList])
+
 /-- Helper lemma to prove `bfs_complete`:
-    If a path of length k from root to v exists avoiding all vertices in visited,
-    then after k more BFS rounds, v will appear in dist with value ≤ d + k. -/
-lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
+    If a simple path of length k ending at v exists whose head lies in frontier
+    and whose non-head vertices avoid visited, then BFS records v with distance ≤ d + k. -/
+private lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (v : α)
     (n : ℕ) (visited frontier : Finset α) (d : ℕ) (init_dist : α → ℕ∞)
     (w : Walk α) (hw : Path.IsPathIn G w) (hw_head : w.head ∈ frontier)
     (hw_tail : w.tail = v) (hw_avoid : ∀ x ∈ w.support, x ≠ w.head → x ∉ visited)
@@ -218,7 +274,7 @@ lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
       set next  := (Finset.biUnion frontier (fun u ↦ N⁺(G, u))) \ visited
       -- Case split on walk length
       rcases Nat.eq_zero_or_pos w.length with h_len | h_len
-      · -- w.length = 0, so w is a trivial walk, v = w.head ∈ frontier
+      · -- case `w.length = 0`: w is a trivial walk, v = w.head ∈ frontier
         -- v gets distance d from dist', then bfs_stable keeps it
         have hv_front : v ∈ frontier :=
           hw_tail ▸ (Walk.head_eq_tail_of_length_zero w h_len ▸ hw_head)
@@ -231,11 +287,137 @@ lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
               (Finset.mem_union_left _ hv_vis) hv_not_next]
         simp only [dist', if_pos hv_front]
         simp [h_len]
-      · -- w.length = k + 1, decompose walk
+      · -- case `w.length > 0`: let w.length = k + 1, decompose walk
         -- get the second vertex in the support (index 1) and split the walk there
         have h_support_len : w.support.length = w.length + 1 := by
           simp [Walk.support, VertexSeq.toList_length_eq]
-        sorry
+        obtain ⟨a₁, ha₁_supp, ha₁_neq, ha₁_edge⟩ :
+            ∃ a₁ ∈ w.support, a₁ ≠ w.head ∧ (w.head, a₁) ∈ G.edgeSet := by
+          exact isWalkIn_first_edge G w hw.1 h_len
+        -- ── Part 1: a₁ ∈ next ────────────────────────────────────────────────────
+        have ha₁_out : a₁ ∈ N⁺(G, w.head) := by
+          simp only [OutNeighbors, Finset.mem_filter]
+          exact ⟨(G.incidence _ ha₁_edge).2,
+                (w.head, a₁), ha₁_edge, rfl, rfl, ha₁_neq⟩
+        have ha₁_next : a₁ ∈ next :=
+          Finset.mem_sdiff.mpr
+            ⟨Finset.mem_biUnion.mpr ⟨w.head, hw_head, ha₁_out⟩,
+            hw_avoid a₁ ha₁_supp ha₁_neq⟩
+        -- ── Part 2: find u = first element of w.support.dropLast in next ──────────
+        -- Exists: a₁ ∈ w.support.dropLast ∩ next
+        -- (a₁ ∈ w.support and a₁ ≠ w.head, so it's not the last element w.head)
+        -- Use List.find? to pick the FIRST such element (last in walk order)
+        have ha₁_in_dropLast : a₁ ∈ w.support.dropLast := by
+          apply List.mem_dropLast_of_mem_of_ne_getLast ha₁_supp
+          have : w.support.getLast (List.ne_nil_of_mem ha₁_supp) = w.head :=
+            vertexSeq_toList_getLast w.seq (List.ne_nil_of_mem ha₁_supp)
+          rw [this]
+          exact ha₁_neq
+        -- find?_isSome (available as @[simp]) to obtain the form ∃ x, x ∈ xs ∧ p x
+        have h_find : (w.support.dropLast.find? (· ∈ next)).isSome := by
+          simp only [List.find?_isSome]
+          exact ⟨a₁, ha₁_in_dropLast, by simpa using ha₁_next⟩
+        obtain ⟨u, hu_def⟩ := Option.isSome_iff_exists.mp h_find
+        have hu_next : u ∈ next := by
+          rw [List.find?_eq_some_iff_append] at hu_def
+          exact of_decide_eq_true hu_def.1
+        have hu_supp : u ∈ w.support :=
+          List.dropLast_subset w.support (List.mem_of_find?_eq_some hu_def)
+        have hu_ne_hd : u ≠ w.head       := by
+          intro h; rw [h] at hu_next
+          exact (Finset.mem_sdiff.mp hu_next).2 (hfv hw_head)
+        -- all elements BEFORE u in the list are not in next (u is the first)
+        obtain ⟨_, as, bs, heq_split, has_not⟩ := List.find?_eq_some_iff_append.mp hu_def
+        have hu_prev : ∀ x ∈ as, x ∉ next := fun x hx => by simpa using has_not x hx
+        -- ── Part 3: suffix walk from u to v, verify IH conditions ─────────────────
+        let w' : Walk α :=
+          ⟨w.seq.dropUntil u hu_supp, dropUntil_iswalk w.seq u hu_supp w.valid⟩
+        have hw'_head : w'.head = u    := VertexSeq.head_dropUntil w.seq u hu_supp
+        have hw'_tail : w'.tail = v    := by
+          simp only [w', Walk.tail]; rw [VertexSeq.tail_dropUntil]; exact hw_tail
+        have hw'_path : Path.IsPathIn G w' := Path.IsPathIn.suffix G w u hu_supp hw
+        have hw'_lt_w : w'.length < w.length :=
+          dropUntil_length_lt_of_ne_head hu_supp hu_ne_hd
+        have hw'_len_lt : w'.length < n := by omega
+        have hw'_avoid : ∀ x ∈ w'.support, x ≠ w'.head → x ∉ visited ∪ next := by
+          intro x hx hxu
+          have hx_supp : x ∈ w.support  := VertexSeq.mem_dropUntil w.seq u x hu_supp hx
+          have hw_head_in_take : w.head ∈ (w.seq.takeUntil u hu_supp).dropTail.toList := by
+            have : (w.seq.takeUntil u hu_supp).dropTail.head = w.head := by
+              simp [VertexSeq.dropTail_head, VertexSeq.head_takeUntil]
+            exact this ▸ VertexSeq.head_mem_toList _
+          have hlist : w.support = w'.support ++ (w.seq.takeUntil u hu_supp).dropTail.toList := by
+            simp only [Walk.support]
+            rw [← Walk.toList_append, Walk.vertex_seq_split w.seq u hu_supp hu_ne_hd]
+          have hx_ne_hd : x ≠ w.head := by
+            have hnodup : (w'.support ++ (w.seq.takeUntil u hu_supp).dropTail.toList).Nodup := by
+              rw [← hlist]; exact hw.2
+            exact (List.nodup_append.mp hnodup).2.2 x hx w.head hw_head_in_take
+          refine Finset.notMem_union.mpr ⟨hw_avoid x hx_supp hx_ne_hd, ?_⟩
+          -- x comes before u in the support list (because x is in the dropUntil prefix)
+          have hxu_val : x ≠ u := hw'_head ▸ hxu
+          -- u = getLast w'.support
+          have hu_last : w'.support.getLast (List.ne_nil_of_mem hx) = u := by
+            simp only [Walk.support, vertexSeq_toList_getLast]
+            exact hw'_head
+          -- x ∈ w'.support.dropLast
+          have hx_dL : x ∈ w'.support.dropLast := by
+            apply List.mem_dropLast_of_mem_of_ne_getLast hx
+            rw [hu_last]; exact hxu_val
+          -- w'.support.dropLast ++ u :: T.dropLast = as ++ u :: bs
+          have hTne : (w.seq.takeUntil u hu_supp).dropTail.toList ≠ [] :=
+            List.ne_nil_of_mem hw_head_in_take
+          have heq2 : w'.support.dropLast ++ u :: (
+            w.seq.takeUntil u hu_supp
+          ).dropTail.toList.dropLast = as ++ u :: bs := by
+            have h1 : w.support.dropLast = w'.support.dropLast ++ u ::
+                (w.seq.takeUntil u hu_supp).dropTail.toList.dropLast := by
+              rw [hlist, List.dropLast_append_of_ne_nil hTne,
+                  ← List.dropLast_append_getLast (List.ne_nil_of_mem hx), hu_last]
+              simp [List.append_assoc]
+            rw [← h1]; exact heq_split
+          -- u ∉ w'.support.dropLast
+          have hu_ndL : u ∉ w'.support.dropLast := by
+            intro h
+            have hnd : (w'.support.dropLast ++ [u]).Nodup := by
+              have heq_list : w'.support.dropLast ++ [u] = w'.support := by
+                rw [← hu_last, List.dropLast_append_getLast (List.ne_nil_of_mem hx)]
+              rw [heq_list]; exact hw'_path.2
+            exact absurd (
+              (List.nodup_append.mp hnd).2.2 u h u (List.mem_singleton.mpr rfl)
+            ) (fun h => h rfl)
+          -- u ∉ as
+          have hu_nas : u ∉ as := fun h => absurd hu_next (by simpa using has_not u h)
+          -- lengths equal ⟹ w'.support.dropLast = as
+          have hlen : w'.support.dropLast.length = as.length := by
+            suffices h : w'.support.dropLast = as from congr_arg _ h
+            rcases List.append_eq_append_iff.mp heq2 with ⟨l, h1, h2⟩ | ⟨l, h1, h2⟩
+            · cases l with
+              | nil => simpa using h1.symm
+              | cons a rest =>
+                  simp only [List.cons_append] at h2
+                  have ha : u = a := (List.cons.inj h2).1
+                  have hmem : a ∈ as :=
+                    h1.symm ▸ List.mem_append_right w'.support.dropLast List.mem_cons_self
+                  exact absurd (ha.symm ▸ hmem) hu_nas
+            · cases l with
+              | nil => simpa using h1
+              | cons a rest =>
+                  simp only [List.cons_append] at h2
+                  have ha : u = a := (List.cons.inj h2).1
+                  have hmem : a ∈ w'.support.dropLast :=
+                    h1.symm ▸ List.mem_append_right as List.mem_cons_self
+                  exact absurd (ha.symm ▸ hmem) hu_ndL
+          exact hu_prev x (List.append_inj_left heq2 hlen ▸ hx_dL)
+        -- ── Part 4: apply IH and arithmetic ──────────────────────────────────────
+        have hbound := ih (visited ∪ next) next (d + 1) dist' w'
+                          hw'_path (hw'_head ▸ hu_next) hw'_tail hw'_avoid
+                          Finset.subset_union_right hw'_len_lt
+        calc bfsAlgorithm.bfs G n (visited ∪ next) next (d + 1) dist' v
+            ≤ ↑(d + 1) + ↑w'.length := hbound
+          _ ≤ ↑d + ↑w.length        := by
+                have h : w'.length + 1 ≤ w.length := Nat.succ_le_of_lt hw'_lt_w
+                exact_mod_cast (show d + 1 + w'.length ≤ d + w.length by omega)
 
 /-- Sub Goal A for `bfs_correct`:
     If a path of length `k` exists from `root` vertex to `v` in `G`,
@@ -243,7 +425,28 @@ lemma bfs_complete_aux [Fintype α] (G : SimpleDiGraph α) (root v : α)
 lemma bfs_complete [Fintype α] (G : SimpleDiGraph α) (root : α) (v : α) (k : ℕ)
     (hk : ∃ w : Walk α, Path.IsPathIn G w ∧ w.head = root ∧ w.tail = v ∧ (w.length : ℕ∞) = k) :
     bfsAlgorithm.bfsDistance G root v ≤ k := by
-  sorry
+  obtain ⟨w, hw, hw_head, hw_tail, hw_len⟩ := hk
+  rw [← hw_len]
+  simp only [bfsAlgorithm.bfsDistance, bfsAlgorithm.bfsDistances]
+  have hn : w.length < Fintype.card α := by
+    have h1 : w.support.length = w.length + 1 := by
+      simp [Walk.support, VertexSeq.toList_length_eq]
+    have h2 : w.support.length ≤ Fintype.card α := by
+      have hnd : w.support.Nodup := hw.2
+      calc w.support.length
+          = w.support.toFinset.card := (List.toFinset_card_of_nodup hnd).symm
+        _ ≤ Finset.univ.card        := Finset.card_le_card (Finset.subset_univ _)
+        _ = Fintype.card α          := Finset.card_univ
+    omega
+  have haux := bfs_complete_aux G v (Fintype.card α) {root} {root} 0 (fun _ => ⊤) w
+    hw
+    (Finset.mem_singleton.mpr hw_head)
+    hw_tail
+    (fun x _ hne => mt Finset.mem_singleton.mp (hw_head ▸ hne))
+    (Finset.Subset.refl _)
+    hn
+  simp only [Nat.cast_zero, zero_add] at haux
+  exact_mod_cast haux
 
 /-- Sub Goal B for `bfs_correct`:
     If `bfs G n visited frontier d dist v` = k,
@@ -343,5 +546,4 @@ theorem bfs_correct [Fintype α] (G : SimpleDiGraph α) (v₁ v₂ : α)
 end bfsCorrectness
 
 -- #TODOs:
--- 1. A theorem to show whether the definitions can find a shortest path in a graph
--- 2. Try replicate the `UndirectedGraphs.Walk` into the `DirectedGraphs.Walk` -/
+-- 1. Try replicate the `UndirectedGraphs.Walk` into the `DirectedGraphs.Walk` -/
