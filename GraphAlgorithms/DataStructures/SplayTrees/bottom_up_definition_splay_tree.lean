@@ -105,3 +105,71 @@ def splayBU [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α :=
 search path. -/
 def splayBU.cost [LinearOrder α] (t : BinaryTree α) (q : α) : ℝ :=
   (descend t q).2.length
+
+/-- Reassemble a subtree `c` with its ancestral path `path` (deepest frame
+first) back into the original tree. -/
+def reassemble (c : BinaryTree α) (path : List (Frame α)) : BinaryTree α :=
+  path.foldl (fun c' f => f.attach c') c
+
+@[simp] lemma reassemble_nil (c : BinaryTree α) : reassemble c [] = c := rfl
+
+@[simp] lemma reassemble_cons (c : BinaryTree α) (f : Frame α) (rest : List (Frame α)) :
+    reassemble c (f :: rest) = reassemble (f.attach c) rest := rfl
+
+/-- Number of nodes a single frame contributes when re-attached: the
+ancestor itself plus its sibling subtree. -/
+def Frame.nodes (f : Frame) : ℕ := 1 + f.sibling.num_nodes
+
+/-- Total number of nodes contributed by a path above a subtree. -/
+def pathNodes : List Frame → ℕ
+  | [] => 0
+  | f :: rest => f.nodes + pathNodes rest
+
+
+-- =========================================================================
+-- §2  Unfolding / induction lemmas for `splayUp`
+-- =========================================================================
+
+
+@[simp] theorem splayUp_nil (c : BinaryTree) : splayUp c [] = c := rfl
+
+@[simp] theorem splayUp_singleton (c : BinaryTree) (f : Frame) :
+    splayUp c [f] = f.dir.bringUp (f.attach c) := rfl
+
+theorem splayUp_cons_cons (c : BinaryTree) (f1 f2 : Frame) (rest : List Frame) :
+    splayUp c (f1 :: f2 :: rest) =
+      splayUp
+        (if f1.dir = f2.dir then
+          f2.dir.bringUp (f2.dir.bringUp (f2.attach (f1.attach c)))
+        else
+          f2.dir.bringUp (applyChild f2.dir f1.dir.bringUp
+            (f2.attach (f1.attach c))))
+        rest := rfl
+
+theorem splayUp_cons_cons_same (c : BinaryTree) (f1 f2 : Frame)
+    (rest : List Frame) (h : f1.dir = f2.dir) :
+    splayUp c (f1 :: f2 :: rest) =
+      splayUp (f2.dir.bringUp (f2.dir.bringUp (f2.attach (f1.attach c)))) rest := by
+  rw [splayUp_cons_cons]; simp [h]
+
+theorem splayUp_cons_cons_opp (c : BinaryTree) (f1 f2 : Frame)
+    (rest : List Frame) (h : f1.dir ≠ f2.dir) :
+    splayUp c (f1 :: f2 :: rest) =
+      splayUp (f2.dir.bringUp
+        (applyChild f2.dir f1.dir.bringUp (f2.attach (f1.attach c)))) rest := by
+  rw [splayUp_cons_cons]; simp [h]
+
+/-- Two-step induction principle specialised to `splayUp`: base (empty path),
+singleton frame, and the general pair-cons step. The tree `c` is
+generalised automatically. -/
+theorem splayUp_induction
+    {motive : BinaryTree → List Frame → Prop}
+    (nil : ∀ c, motive c [])
+    (single : ∀ c f, motive c [f])
+    (step : ∀ c f1 f2 rest,
+      (∀ c', motive c' rest) → motive c (f1 :: f2 :: rest))
+    (c : BinaryTree) (path : List Frame) : motive c path := by
+  induction path using List.twoStepInduction generalizing c with
+  | nil => exact nil c
+  | singleton f => exact single c f
+  | cons_cons f1 f2 rest ih _ => exact step c f1 f2 rest (fun c' => ih c')

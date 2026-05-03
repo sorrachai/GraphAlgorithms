@@ -11,6 +11,7 @@ Key theorems:
 
 import GraphAlgorithms.DataStructures.SplayTrees.bottom_up_definition_splay_tree
 
+
 set_option autoImplicit false
 
 -- ============================================================
@@ -44,14 +45,17 @@ lemma forallTree_splayUp {α : Type} {p : α → Prop} (c : BinaryTree α) (path
     unfold splayUp
     match rest with
     | [] =>
-      have ⟨hp, hs⟩ := hpath f (List.mem_cons_self f [])
-      simp [Dir.bringUp, rotateRight, rotateLeft]
-      exact forallTree_frame_attach c f hc hp hs
+      have ⟨hp, hs⟩ := hpath f (by simp)
+      simp [Dir.bringUp]
+      by_cases f.dir with
+      | .L => sorry
+      | .R => sorry
+
     | f2 :: rest' =>
-      have ⟨hp1, hs1⟩ := hpath f (List.mem_cons_self f (f2 :: rest'))
+      have ⟨hp1, hs1⟩ := hpath f (by simp)
       have hpath_rest : ∀ f ∈ f2 :: rest', p f.key ∧ ForallTree p f.sibling := by
         intros f' hf'; exact hpath f' (List.mem_cons_of_mem f hf')
-      have ⟨hp2, hs2⟩ := hpath f2 (List.mem_cons_self f2 rest')
+      have ⟨hp2, hs2⟩ := hpath f2 (by simp)
       let s := f2.attach (f.attach c)
       have hs : ForallTree p s := forallTree_frame_attach (f.attach c) f2
         (forallTree_frame_attach c f hc hp1 hs1) hp2 hs2
@@ -82,7 +86,7 @@ lemma rotateLeft_preserves_BST {α : Type} [LinearOrder α] {t : BinaryTree α} 
   unfold rotateLeft
   match t with
   | .empty => exact h
-  | .node l k .empty => exact hs
+  | .node l k .empty => exact h
   | .node a y (.node b x c) =>
     have hFR := h.forallTree_right; have hBR := h.right_bst
     exact .node _ _ _
@@ -94,7 +98,8 @@ lemma rotateLeft_preserves_BST {α : Type} [LinearOrder α] {t : BinaryTree α} 
       hBR.right_bst
 
 /-- Rotating according to direction preserves BST. -/
-lemma dir_bringUp_preserves_BST {α : Type} [LinearOrder α] (d : Dir) {t : BinaryTree α} (h : IsBST α t) :
+lemma dir_bringUp_preserves_BST {α : Type} [LinearOrder α] (d : Dir) {t : BinaryTree α}
+(h : IsBST α t) :
     IsBST α (d.bringUp t) := by
   match d with
   | .L => exact rotateRight_preserves_BST h
@@ -222,4 +227,3 @@ lemma splayBU_preserves_forallTree {α : Type} {p : α → Prop} (t : BinaryTree
     apply forallTree_splayUp
     · exact h
     · intros f' hf'; exact hframes f' hf'
-

@@ -5,6 +5,7 @@ import Mathlib.Analysis.SpecialFunctions.Log.Base
 
 set_option autoImplicit false
 
+variable {α : Type}
 
 -- =========================================================================
 -- §1  Definitions
@@ -12,11 +13,11 @@ set_option autoImplicit false
 -- Rotation primitives, direction / frame types, descend, splayUp, splayBU.
 
 
-def rotateRight : BinaryTree → BinaryTree
+def rotateRight : BinaryTree α → BinaryTree α
   | .node (.node a x b) y c => .node a x (.node b y c)
   | t => t
 
-def rotateLeft : BinaryTree → BinaryTree
+def rotateLeft : BinaryTree α → BinaryTree α
   | .node a x (.node b y c) => .node (.node a x b) y c
   | t => t
 
@@ -28,12 +29,12 @@ inductive Dir
 
 /-- Single primitive rotation that brings the `d`-child of the root up one
 level. `L` ↦ `rotateRight`, `R` ↦ `rotateLeft`. -/
-def Dir.bringUp : Dir → BinaryTree → BinaryTree
+def Dir.bringUp : Dir → BinaryTree α → BinaryTree α
   | .L => rotateRight
   | .R => rotateLeft
 
 /-- Apply `op` to the `d`-child of the root, leaving everything else fixed. -/
-def applyChild (d : Dir) (op : BinaryTree → BinaryTree) : BinaryTree → BinaryTree
+def applyChild (d : Dir) (op : BinaryTree α → BinaryTree α) : BinaryTree α → BinaryTree α
   | .node l k r =>
     match d with
     | .L => .node (op l) k r
@@ -42,13 +43,13 @@ def applyChild (d : Dir) (op : BinaryTree → BinaryTree) : BinaryTree → Binar
 
 /-- One frame of the search path: the direction we took from this ancestor,
 its key, and the subtree we did *not* descend into. -/
-structure Frame where
+structure Frame α where
   dir : Dir
-  key : ℕ
-  sibling : BinaryTree
+  key : α
+  sibling : BinaryTree α
 
 /-- Re-attach a subtree `c` below the ancestor described by `f`. -/
-def Frame.attach (c : BinaryTree) (f : Frame) : BinaryTree :=
+def Frame.attach (c : BinaryTree α) (f : Frame α) : BinaryTree α :=
   match f.dir with
   | .L => .node c f.key f.sibling
   | .R => .node f.sibling f.key c
@@ -56,10 +57,10 @@ def Frame.attach (c : BinaryTree) (f : Frame) : BinaryTree :=
 /-- Descend from `t` toward `q`, returning the subtree reached (either the
 matching node or `.empty` if `q` is absent) and the path above it. The head
 of the returned list is the deepest frame (parent of the returned subtree). -/
-def descend (t : BinaryTree) (q : ℕ) : BinaryTree × List Frame :=
+def descend [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α × List (Frame α) :=
   go t []
 where
-  go : BinaryTree → List Frame → BinaryTree × List Frame
+  go : BinaryTree α → List (Frame α) → BinaryTree α × List (Frame α)
   | .empty, acc => (.empty, acc)
   | .node l k r, acc =>
     if q = k then (.node l k r, acc)
@@ -74,7 +75,7 @@ up. Each double step (parent `f1`, grandparent `f2`) is:
   `f2.dir`-child (in direction `f1.dir`), then one outer rotation (in
   direction `f2.dir`).
 A leftover single frame is a plain zig/zag. -/
-def splayUp : BinaryTree → List Frame → BinaryTree
+def splayUp : BinaryTree α → List (Frame α) → BinaryTree α
   | c, [] => c
   | c, [f] => f.dir.bringUp (f.attach c)
   | c, f1 :: f2 :: rest =>
@@ -88,7 +89,7 @@ def splayUp : BinaryTree → List Frame → BinaryTree
 
 /-- Bottom-up splay: the "textbook" splay analysed by Tarjan, Sundar, and
 Elmasry. If `q` is absent the last visited ancestor is splayed to the root. -/
-def splayBU (t : BinaryTree) (q : ℕ) : BinaryTree :=
+def splayBU [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α :=
   match descend t q with
   | (.empty, []) => .empty
   | (.empty, f :: rest) => splayUp (f.attach .empty) rest
@@ -96,27 +97,27 @@ def splayBU (t : BinaryTree) (q : ℕ) : BinaryTree :=
 
 /-- Cost of a bottom-up splay: one unit per rotation, i.e. the length of the
 search path. -/
-def splayBU.cost (t : BinaryTree) (q : ℕ) : ℝ :=
+def splayBU.cost [LinearOrder α] (t : BinaryTree α) (q : α) : ℝ :=
   (descend t q).2.length
 
 
 /-- Reassemble a subtree `c` with its ancestral path `path` (deepest frame
 first) back into the original tree. -/
-def reassemble (c : BinaryTree) (path : List Frame) : BinaryTree :=
+def reassemble (c : BinaryTree α) (path : List (Frame α)) : BinaryTree α :=
   path.foldl (fun c' f => f.attach c') c
 
-@[simp] lemma reassemble_nil (c : BinaryTree) : reassemble c [] = c := rfl
+@[simp] lemma reassemble_nil (c : BinaryTree α) : reassemble c [] = c := rfl
 
-@[simp] lemma reassemble_cons (c : BinaryTree) (f : Frame) (rest : List Frame) :
+@[simp] lemma reassemble_cons (c : BinaryTree α) (f : Frame α) (rest : List (Frame α)) :
     reassemble c (f :: rest) = reassemble (f.attach c) rest := rfl
 
 
 /-- Number of nodes a single frame contributes when re-attached: the
 ancestor itself plus its sibling subtree. -/
-def Frame.nodes (f : Frame) : ℕ := 1 + f.sibling.num_nodes
+def Frame.nodes (f : Frame α) : ℕ := 1 + f.sibling.num_nodes
 
 /-- Total number of nodes contributed by a path above a subtree. -/
-def pathNodes : List Frame → ℕ
+def pathNodes : List (Frame α) → ℕ
   | [] => 0
   | f :: rest => f.nodes + pathNodes rest
 
@@ -126,12 +127,12 @@ def pathNodes : List Frame → ℕ
 -- =========================================================================
 
 
-@[simp] theorem splayUp_nil (c : BinaryTree) : splayUp c [] = c := rfl
+@[simp] theorem splayUp_nil (c : BinaryTree α) : splayUp c [] = c := rfl
 
-@[simp] theorem splayUp_singleton (c : BinaryTree) (f : Frame) :
+@[simp] theorem splayUp_singleton (c : BinaryTree α) (f : Frame α) :
     splayUp c [f] = f.dir.bringUp (f.attach c) := rfl
 
-theorem splayUp_cons_cons (c : BinaryTree) (f1 f2 : Frame) (rest : List Frame) :
+theorem splayUp_cons_cons (c : BinaryTree α) (f1 f2 : Frame α) (rest : List (Frame α)) :
     splayUp c (f1 :: f2 :: rest) =
       splayUp
         (if f1.dir = f2.dir then
@@ -141,14 +142,14 @@ theorem splayUp_cons_cons (c : BinaryTree) (f1 f2 : Frame) (rest : List Frame) :
             (f2.attach (f1.attach c))))
         rest := rfl
 
-theorem splayUp_cons_cons_same (c : BinaryTree) (f1 f2 : Frame)
-    (rest : List Frame) (h : f1.dir = f2.dir) :
+theorem splayUp_cons_cons_same (c : BinaryTree α) (f1 f2 : Frame α)
+    (rest : List (Frame α)) (h : f1.dir = f2.dir) :
     splayUp c (f1 :: f2 :: rest) =
       splayUp (f2.dir.bringUp (f2.dir.bringUp (f2.attach (f1.attach c)))) rest := by
   rw [splayUp_cons_cons]; simp [h]
 
-theorem splayUp_cons_cons_opp (c : BinaryTree) (f1 f2 : Frame)
-    (rest : List Frame) (h : f1.dir ≠ f2.dir) :
+theorem splayUp_cons_cons_opp (c : BinaryTree α) (f1 f2 : Frame α)
+    (rest : List (Frame α)) (h : f1.dir ≠ f2.dir) :
     splayUp c (f1 :: f2 :: rest) =
       splayUp (f2.dir.bringUp
         (applyChild f2.dir f1.dir.bringUp (f2.attach (f1.attach c)))) rest := by
@@ -158,12 +159,12 @@ theorem splayUp_cons_cons_opp (c : BinaryTree) (f1 f2 : Frame)
 singleton frame, and the general pair-cons step. The tree `c` is
 generalised automatically. -/
 theorem splayUp_induction
-    {motive : BinaryTree → List Frame → Prop}
+    {motive : BinaryTree α → List (Frame α) → Prop}
     (nil : ∀ c, motive c [])
     (single : ∀ c f, motive c [f])
     (step : ∀ c f1 f2 rest,
       (∀ c', motive c' rest) → motive c (f1 :: f2 :: rest))
-    (c : BinaryTree) (path : List Frame) : motive c path := by
+    (c : BinaryTree α) (path : List (Frame α)) : motive c path := by
   induction path using List.twoStepInduction generalizing c with
   | nil => exact nil c
   | singleton f => exact single c f
@@ -175,7 +176,7 @@ theorem splayUp_induction
 -- =========================================================================
 
 @[simp, grind =]
-theorem num_nodes_rotateRight (t : BinaryTree) :
+theorem num_nodes_rotateRight (t : BinaryTree α) :
     (rotateRight t).num_nodes = t.num_nodes := by
   unfold rotateRight
   cases t with
@@ -186,7 +187,7 @@ theorem num_nodes_rotateRight (t : BinaryTree) :
     | node ll lk lr => simp; omega
 
 @[simp, grind =]
-theorem num_nodes_rotateLeft (t : BinaryTree) :
+theorem num_nodes_rotateLeft (t : BinaryTree α) :
     (rotateLeft t).num_nodes = t.num_nodes := by
   unfold rotateLeft
   cases t with
@@ -197,25 +198,25 @@ theorem num_nodes_rotateLeft (t : BinaryTree) :
     | node rl rk rr => simp; omega
 
 
-@[simp] lemma pathNodes_nil : pathNodes [] = 0 := rfl
+@[simp] lemma pathNodes_nil : pathNodes ([] : List (Frame α)) = 0 := rfl
 
-@[simp] lemma pathNodes_cons (f : Frame) (rest : List Frame) :
+@[simp] lemma pathNodes_cons (f : Frame α) (rest : List (Frame α)) :
     pathNodes (f :: rest) = f.nodes + pathNodes rest := rfl
 
 @[simp, grind =]
-theorem num_nodes_Frame_attach (c : BinaryTree) (f : Frame) :
+theorem num_nodes_Frame_attach (c : BinaryTree α) (f : Frame α) :
     (f.attach c).num_nodes = c.num_nodes + f.nodes := by
   unfold Frame.attach Frame.nodes
   cases f.dir <;> simp <;> omega
 
 @[simp, grind =]
-theorem num_nodes_bringUp (d : Dir) (t : BinaryTree) :
+theorem num_nodes_bringUp (d : Dir) (t : BinaryTree α) :
     (d.bringUp t).num_nodes = t.num_nodes := by
   cases d <;> simp [Dir.bringUp]
 
 @[simp, grind =]
-theorem num_nodes_applyChild (d : Dir) (op : BinaryTree → BinaryTree)
-    (hop : ∀ s, (op s).num_nodes = s.num_nodes) (t : BinaryTree) :
+theorem num_nodes_applyChild (d : Dir) (op : BinaryTree α → BinaryTree α)
+    (hop : ∀ s, (op s).num_nodes = s.num_nodes) (t : BinaryTree α) :
     (applyChild d op t).num_nodes = t.num_nodes := by
   cases t with
   | empty => rfl
@@ -223,12 +224,12 @@ theorem num_nodes_applyChild (d : Dir) (op : BinaryTree → BinaryTree)
     cases d <;> simp [applyChild, hop]
 
 @[simp, grind =]
-theorem num_nodes_applyChild_bringUp (d₁ d₂ : Dir) (t : BinaryTree) :
+theorem num_nodes_applyChild_bringUp (d₁ d₂ : Dir) (t : BinaryTree α) :
     (applyChild d₁ d₂.bringUp t).num_nodes = t.num_nodes :=
   num_nodes_applyChild _ _ (num_nodes_bringUp _) _
 
 @[simp]
-theorem num_nodes_splayUp (c : BinaryTree) (path : List Frame) :
+theorem num_nodes_splayUp (c : BinaryTree α) (path : List (Frame α)) :
     (splayUp c path).num_nodes = c.num_nodes + pathNodes path := by
   induction path using List.twoStepInduction generalizing c with
   | nil => simp [splayUp]
@@ -239,7 +240,7 @@ theorem num_nodes_splayUp (c : BinaryTree) (path : List Frame) :
     · rw [ih]; simp [Frame.nodes, pathNodes_cons]; omega
     · rw [ih]; simp [Frame.nodes, pathNodes_cons]; omega
 
-theorem num_nodes_descend_go (t : BinaryTree) (q : ℕ) (acc : List Frame) :
+theorem num_nodes_descend_go [LinearOrder α] (t : BinaryTree α) (q : α) (acc : List (Frame α)) :
     let r := descend.go q t acc
     r.1.num_nodes + pathNodes r.2 = t.num_nodes + pathNodes acc := by
   induction t generalizing acc with
@@ -255,13 +256,13 @@ theorem num_nodes_descend_go (t : BinaryTree) (q : ℕ) (acc : List Frame) :
       simp [Frame.nodes] at this ⊢
       omega
 
-theorem num_nodes_descend (t : BinaryTree) (q : ℕ) :
+theorem num_nodes_descend [LinearOrder α] (t : BinaryTree α) (q : α) :
     (descend t q).1.num_nodes + pathNodes (descend t q).2 = t.num_nodes := by
   have := num_nodes_descend_go t q []
   simpa [descend] using this
 
 @[simp]
-theorem num_nodes_splayBU (t : BinaryTree) (q : ℕ) :
+theorem num_nodes_splayBU [LinearOrder α] (t : BinaryTree α) (q : α) :
     (splayBU t q).num_nodes = t.num_nodes := by
   unfold splayBU
   have hd := num_nodes_descend t q
@@ -285,9 +286,9 @@ theorem num_nodes_splayBU (t : BinaryTree) (q : ℕ) :
 -- §4  `descend` characterisations
 -- =========================================================================
 
-@[simp] lemma descend_empty (q : ℕ) : descend .empty q = (.empty, []) := rfl
+@[simp] lemma descend_empty [LinearOrder α] (q : α) : descend .empty q = (.empty, []) := rfl
 
-lemma descend_go_append (q : ℕ) (t : BinaryTree) (acc : List Frame) :
+lemma descend_go_append [LinearOrder α] (q : α) (t : BinaryTree α) (acc : List (Frame α)) :
     descend.go q t acc =
       ((descend.go q t []).1, (descend.go q t []).2 ++ acc) := by
   induction t generalizing acc with
@@ -303,43 +304,44 @@ lemma descend_go_append (q : ℕ) (t : BinaryTree) (acc : List Frame) :
       rw [ihr (acc := [{ dir := .R, key := k, sibling := l }])]
       simp
 
-lemma descend_node_eq (l : BinaryTree) (k : ℕ) (r : BinaryTree) :
+lemma descend_node_eq [LinearOrder α] (l : BinaryTree α) (k : α) (r : BinaryTree α) :
     descend (.node l k r) k = (.node l k r, []) := by
   simp [descend, descend.go]
 
-lemma descend_eq_descend_go (t : BinaryTree) (q : ℕ) :
+lemma descend_eq_descend_go [LinearOrder α] (t : BinaryTree α) (q : α) :
     descend t q = descend.go q t [] := rfl
 
-lemma descend_node_lt {l : BinaryTree} {k : ℕ} {r : BinaryTree} {q : ℕ}
+lemma descend_node_lt [LinearOrder α] {l : BinaryTree α} {k : α} {r : BinaryTree α} {q : α}
     (h : q < k) :
     descend (.node l k r) q =
       ((descend l q).1,
        (descend l q).2 ++ [{ dir := .L, key := k, sibling := r }]) := by
-  have hne : q ≠ k := by omega
+  have hne : q ≠ k := by grind only
   change descend.go q (.node l k r) [] = _
   unfold descend.go
   rw [if_neg hne, if_pos h,
       descend_go_append q l [{ dir := .L, key := k, sibling := r }]]
   rfl
 
-lemma descend_node_gt {l : BinaryTree} {k : ℕ} {r : BinaryTree} {q : ℕ}
+lemma descend_node_gt [LinearOrder α] {l : BinaryTree α} {k : α} {r : BinaryTree α} {q : α}
     (h : k < q) :
     descend (.node l k r) q =
       ((descend r q).1,
        (descend r q).2 ++ [{ dir := .R, key := k, sibling := l }]) := by
-  have hne : q ≠ k := by omega
-  have hnlt : ¬ q < k := by omega
+  have hne : q ≠ k := by grind only
+  have hnlt : ¬ q < k := by grind only
   change descend.go q (.node l k r) [] = _
   unfold descend.go
   rw [if_neg hne, if_neg hnlt,
       descend_go_append q r [{ dir := .R, key := k, sibling := l }]]
   rfl
 
-lemma reassemble_append (c : BinaryTree) (p1 p2 : List Frame) :
+lemma reassemble_append (c : BinaryTree α) (p1 p2 : List (Frame α)) :
     reassemble c (p1 ++ p2) = reassemble (reassemble c p1) p2 := by
   simp [reassemble, List.foldl_append]
 
-theorem descend_go_preserves_tree (t : BinaryTree) (q : ℕ) (acc : List Frame) :
+theorem descend_go_preserves_tree [LinearOrder α] (t : BinaryTree α)
+  (q : α) (acc : List (Frame α)) :
     reassemble (descend.go q t acc).1 (descend.go q t acc).2 =
       reassemble t acc := by
   induction t generalizing acc with
@@ -351,12 +353,12 @@ theorem descend_go_preserves_tree (t : BinaryTree) (q : ℕ) (acc : List Frame) 
     · exact ihl (acc := { dir := .L, key := k, sibling := r } :: acc)
     · exact ihr (acc := { dir := .R, key := k, sibling := l } :: acc)
 
-theorem descend_preserves_tree (t : BinaryTree) (q : ℕ) :
+theorem descend_preserves_tree [LinearOrder α] (t : BinaryTree α) (q : α) :
     reassemble (descend t q).1 (descend t q).2 = t := by
   have := descend_go_preserves_tree t q []
   simpa [descend] using this
 
-lemma descend_go_length_le (q : ℕ) (t : BinaryTree) (acc : List Frame) :
+lemma descend_go_length_le [LinearOrder α] (q : α) (t : BinaryTree α) (acc : List (Frame α)) :
     acc.length ≤ (descend.go q t acc).2.length := by
   induction t generalizing acc with
   | empty => simp [descend.go]
@@ -378,14 +380,15 @@ lemma descend_go_length_le (q : ℕ) (t : BinaryTree) (acc : List Frame) :
 
 
 /-- Subtrees have positive search path length. -/
-lemma search_path_len_node_pos (l : BinaryTree) (k : ℕ) (r : BinaryTree)
-    (q : ℕ) : 1 ≤ (BinaryTree.node l k r).search_path_len q := by
-  unfold BinaryTree.search_path_len; split_ifs <;> omega
+lemma search_path_len_node_pos [LinearOrder α] (l : BinaryTree α) (k : α) (r : BinaryTree α)
+    (q : α) : 1 ≤ (BinaryTree.node l k r).search_path_len q := by
+  unfold BinaryTree.search_path_len
+  ; split_ifs <;> omega
 
 /-- Relation between `search_path_len` and the length of the path produced by
 `descend`. When `descend` reaches a node, the search path is one link longer;
 when it reaches `.empty`, the two are equal. -/
-theorem search_path_len_eq_descend_length (t : BinaryTree) (q : ℕ) :
+theorem search_path_len_eq_descend_length [LinearOrder α] (t : BinaryTree α) (q : α) :
     t.search_path_len q =
       (descend t q).2.length +
         (match (descend t q).1 with | .empty => 0 | .node _ _ _ => 1) := by
@@ -400,7 +403,7 @@ theorem search_path_len_eq_descend_length (t : BinaryTree) (q : ℕ) :
         unfold BinaryTree.search_path_len
         simp only [hlt, if_true, List.length_append, List.length_singleton]
         rw [ihl]; omega
-      · have hgt : k < q := by omega
+      · have hgt : k < q := by grind only
         rw [descend_node_gt hgt]
         unfold BinaryTree.search_path_len
         simp only [hlt, hgt, if_false, if_true, List.length_append,
@@ -409,10 +412,10 @@ theorem search_path_len_eq_descend_length (t : BinaryTree) (q : ℕ) :
 
 /-- The bottom-up splay cost equals the length of the descended path
 (equivalently, the number of rotations performed). -/
-theorem splayBU_cost_eq_length (t : BinaryTree) (q : ℕ) :
+theorem splayBU_cost_eq_length [LinearOrder α] (t : BinaryTree α) (q : α) :
     splayBU.cost t q = ((descend t q).2.length : ℝ) := rfl
 
-theorem splayBU_cost_nonneg (t : BinaryTree) (q : ℕ) :
+theorem splayBU_cost_nonneg [LinearOrder α] (t : BinaryTree α) (q : α) :
     0 ≤ splayBU.cost t q := by
   unfold splayBU.cost; exact Nat.cast_nonneg _
 
@@ -424,7 +427,7 @@ theorem splayBU_cost_nonneg (t : BinaryTree) (q : ℕ) :
 
 open BinaryTree (toKeyList)
 
-@[simp, grind =] theorem toKeyList_rotateRight (t : BinaryTree) :
+@[simp, grind =] theorem toKeyList_rotateRight (t : BinaryTree α) :
     (rotateRight t).toKeyList = t.toKeyList := by
   unfold rotateRight
   cases t with
@@ -433,7 +436,7 @@ open BinaryTree (toKeyList)
     cases l with
     | empty => rfl
     | node ll lk lr => simp [toKeyList]
-@[simp, grind =] theorem toKeyList_rotateLeft (t : BinaryTree) :
+@[simp, grind =] theorem toKeyList_rotateLeft (t : BinaryTree α) :
     (rotateLeft t).toKeyList = t.toKeyList := by
   unfold rotateLeft
   cases t with
@@ -443,23 +446,23 @@ open BinaryTree (toKeyList)
     | empty => rfl
     | node rl rk rr => simp [toKeyList]
 
-@[simp, grind =] theorem toKeyList_bringUp (d : Dir) (t : BinaryTree) :
+@[simp, grind =] theorem toKeyList_bringUp (d : Dir) (t : BinaryTree α) :
     (d.bringUp t).toKeyList = t.toKeyList := by
   cases d <;> simp [Dir.bringUp]
 
-@[simp, grind =] theorem toKeyList_applyChild (d : Dir) (op : BinaryTree → BinaryTree)
-    (hop : ∀ s, (op s).toKeyList = s.toKeyList) (t : BinaryTree) :
+@[simp, grind =] theorem toKeyList_applyChild (d : Dir) (op : BinaryTree α → BinaryTree α)
+    (hop : ∀ s, (op s).toKeyList = s.toKeyList) (t : BinaryTree α) :
     (applyChild d op t).toKeyList = t.toKeyList := by
   cases t with
   | empty => rfl
   | node l k r => cases d <;> simp [applyChild, toKeyList, hop]
 
 @[simp, grind =]
-theorem toKeyList_applyChild_bringUp (d₁ d₂ : Dir) (t : BinaryTree) :
+theorem toKeyList_applyChild_bringUp (d₁ d₂ : Dir) (t : BinaryTree α) :
     (applyChild d₁ d₂.bringUp t).toKeyList = t.toKeyList :=
   toKeyList_applyChild _ _ (toKeyList_bringUp _) _
 
-@[simp, grind =] theorem toKeyList_Frame_attach (c : BinaryTree) (f : Frame) :
+@[simp, grind =] theorem toKeyList_Frame_attach (c : BinaryTree α) (f : Frame α) :
     (f.attach c).toKeyList =
       (match f.dir with
         | .L => c.toKeyList ++ [f.key] ++ f.sibling.toKeyList
@@ -467,7 +470,7 @@ theorem toKeyList_applyChild_bringUp (d₁ d₂ : Dir) (t : BinaryTree) :
   unfold Frame.attach
   cases f.dir <;> simp [toKeyList]
 
-lemma reassemble_toKeyList_congr {c1 c2 : BinaryTree} (path : List Frame)
+lemma reassemble_toKeyList_congr {c1 c2 : BinaryTree α} (path : List (Frame α))
     (h : c1.toKeyList = c2.toKeyList) :
     (reassemble c1 path).toKeyList = (reassemble c2 path).toKeyList := by
   induction path generalizing c1 c2 with
@@ -477,7 +480,7 @@ lemma reassemble_toKeyList_congr {c1 c2 : BinaryTree} (path : List Frame)
     simp [h]
 
 @[simp, grind =]
-theorem toKeyList_splayUp (c : BinaryTree) (path : List Frame) :
+theorem toKeyList_splayUp (c : BinaryTree α) (path : List (Frame α)) :
     (splayUp c path).toKeyList = (reassemble c path).toKeyList := by
   induction c, path using splayUp_induction with
   | nil c => simp
@@ -490,7 +493,7 @@ theorem toKeyList_splayUp (c : BinaryTree) (path : List Frame) :
     · rw [ih]; apply reassemble_toKeyList_congr; simp
 
 @[simp, grind =]
-theorem toKeyList_splayBU (t : BinaryTree) (q : ℕ) :
+theorem toKeyList_splayBU [LinearOrder α] (t : BinaryTree α) (q : α) :
     (splayBU t q).toKeyList = t.toKeyList := by
   unfold splayBU
   have hpres := descend_preserves_tree t q
@@ -507,7 +510,7 @@ theorem toKeyList_splayBU (t : BinaryTree) (q : ℕ) :
       rw [h] at hpres
       rw [toKeyList_splayUp, ← hpres]
 
-theorem splayBU_empty_iff (t : BinaryTree) (q : ℕ) :
+theorem splayBU_empty_iff [LinearOrder α] (t : BinaryTree α) (q : α) :
     splayBU t q = .empty ↔ t = .empty := by
   constructor
   · intro h
@@ -527,7 +530,7 @@ theorem splayBU_empty_iff (t : BinaryTree) (q : ℕ) :
 
 /-- `ForallTree p t` is equivalent to "every key in the in-order traversal
 of `t` satisfies `p`". Reduces tree-quantifier reasoning to list-membership. -/
-lemma ForallTree_iff_toKeyList (p : ℕ → Prop) (t : BinaryTree) :
+lemma ForallTree_iff_toKeyList (p : α → Prop) (t : BinaryTree α) :
     ForallTree p t ↔ ∀ k ∈ t.toKeyList, p k := by
   induction t with
   | empty =>
@@ -554,7 +557,7 @@ lemma ForallTree_iff_toKeyList (p : ℕ → Prop) (t : BinaryTree) :
 /-- A tree is a BST iff its in-order traversal is strictly sorted (pairwise
 `<`). Reduces every BST-preservation question to "does the operation
 preserve `toKeyList`?". -/
-theorem IsBST_iff_toKeyList_sorted (t : BinaryTree) :
+theorem IsBST_iff_toKeyList_sorted [LinearOrder α] (t : BinaryTree α) :
     IsBST t ↔ t.toKeyList.Pairwise (· < ·) := by
   induction t with
   | empty =>
@@ -594,28 +597,28 @@ theorem IsBST_iff_toKeyList_sorted (t : BinaryTree) :
       · exact (ForallTree_iff_toKeyList _ _).mpr hkr
 
 /-- Transfer BST-ness between trees with the same in-order traversal. -/
-lemma IsBST_of_toKeyList_eq {t t' : BinaryTree}
+lemma IsBST_of_toKeyList_eq [LinearOrder α] {t t' : BinaryTree α}
     (h : t'.toKeyList = t.toKeyList) (hbst : IsBST t) : IsBST t' := by
   rw [IsBST_iff_toKeyList_sorted] at hbst ⊢; rwa [h]
 
 /-- Bottom-up splay preserves the BST invariant. -/
-theorem IsBST_splayBU (t : BinaryTree) (q : ℕ) (h : IsBST t) :
+theorem IsBST_splayBU [LinearOrder α] (t : BinaryTree α) (q : α) (h : IsBST t) :
     IsBST (splayBU t q) :=
   IsBST_of_toKeyList_eq (toKeyList_splayBU t q) h
 
 /-- Each primitive rotation preserves the BST invariant. -/
-theorem IsBST_bringUp (d : Dir) (t : BinaryTree) (h : IsBST t) :
+theorem IsBST_bringUp [LinearOrder α] (d : Dir) (t : BinaryTree α) (h : IsBST t) :
     IsBST (d.bringUp t) :=
   IsBST_of_toKeyList_eq (toKeyList_bringUp d t) h
 
-theorem IsBST_applyChild (d : Dir) (op : BinaryTree → BinaryTree)
+theorem IsBST_applyChild [LinearOrder α] (d : Dir) (op : BinaryTree α → BinaryTree α)
     (hop_keys : ∀ s, (op s).toKeyList = s.toKeyList)
-    (t : BinaryTree) (h : IsBST t) :
+    (t : BinaryTree α) (h : IsBST t) :
     IsBST (applyChild d op t) :=
   IsBST_of_toKeyList_eq (toKeyList_applyChild d op hop_keys t) h
 
 /-- Any frame-wise splay-up preserves BST-ness of the reassembled tree. -/
-theorem IsBST_splayUp (c : BinaryTree) (path : List Frame)
+theorem IsBST_splayUp [LinearOrder α] (c : BinaryTree α) (path : List (Frame α))
     (h : IsBST (reassemble c path)) : IsBST (splayUp c path) :=
   IsBST_of_toKeyList_eq (toKeyList_splayUp c path) h
 
@@ -628,7 +631,7 @@ theorem IsBST_splayUp (c : BinaryTree) (path : List Frame)
 /-- If `t.contains q`, the subtree reached by `descend` is a node whose key
 equals `q`. Mirrors how `descend` and `BinaryTree.contains` follow the same
 comparison path. -/
-theorem descend_contains (t : BinaryTree) (q : ℕ) (h : t.contains q) :
+theorem descend_contains [LinearOrder α] (t : BinaryTree α) (q : α) (h : t.contains q) :
     ∃ l r, (descend t q).1 = .node l q r := by
   induction t with
   | empty => simp [BinaryTree.contains] at h
@@ -645,7 +648,7 @@ theorem descend_contains (t : BinaryTree) (q : ℕ) (h : t.contains q) :
         obtain ⟨l', r', hd⟩ := ihr h
         refine ⟨l', r', ?_⟩
         rw [descend_node_gt hgt]; exact hd
-      · have hqk : q = k := by omega
+      · have hqk : q = k := by grind only
         subst hqk
         refine ⟨lt, rt, ?_⟩
         rw [descend_node_eq]
@@ -654,7 +657,7 @@ theorem descend_contains (t : BinaryTree) (q : ℕ) (h : t.contains q) :
 whose root key is still `k`. Each rotation step (`bringUp`, `applyChild
 bringUp`) brings `c` one level higher without changing its root key. -/
 theorem splayUp_root_key_of_node :
-    ∀ (path : List Frame) (l : BinaryTree) (k : ℕ) (r : BinaryTree),
+    ∀ (path : List (Frame α)) (l : BinaryTree α) (k : α) (r : BinaryTree α),
       ∃ l' r', splayUp (.node l k r) path = .node l' k r' := by
   intro path
   induction path using List.twoStepInduction with
@@ -692,7 +695,7 @@ theorem splayUp_root_key_of_node :
 
 /-- If `t.contains q`, the bottom-up splay of `t` at `q` has `q` at the root.
 Replaces `Correctness.splay_root_of_contains` for `splayBU`. -/
-theorem splayBU_root_of_contains (t : BinaryTree) (q : ℕ)
+theorem splayBU_root_of_contains [LinearOrder α] (t : BinaryTree α) (q : α)
     (hc : t.contains q) : ∃ l r, splayBU t q = .node l q r := by
   obtain ⟨lr, rr, hd⟩ := descend_contains t q hc
   unfold splayBU
@@ -715,11 +718,11 @@ theorem splayBU_root_of_contains (t : BinaryTree) (q : ℕ)
 noncomputable section
 
 /-- Rank of a tree: `log₂(num_nodes)`, or 0 for the empty tree. -/
-def rank (t : BinaryTree) : ℝ :=
+def rank (t : BinaryTree α) : ℝ :=
   if t.num_nodes = 0 then 0 else Real.logb 2 t.num_nodes
 
 /-- Potential of a tree: sum of ranks over all subtrees (including itself). -/
-def φ : BinaryTree → ℝ
+def φ : BinaryTree α → ℝ
   | .empty => 0
   | s@(.node l _ r) => rank s + φ l + φ r
 
@@ -727,25 +730,25 @@ def φ : BinaryTree → ℝ
 --  Basic rank / potential lemmas
 -- -------------------------------------------------------------------------
 
-@[simp] lemma rank_empty : rank .empty = 0 := by simp [rank]
+@[simp] lemma rank_empty : rank (.empty : BinaryTree α) = 0 := by simp [rank]
 
-lemma rank_nonneg (t : BinaryTree) : 0 ≤ rank t := by
+lemma rank_nonneg (t : BinaryTree α) : 0 ≤ rank t := by
   simp only [rank]; split_ifs with h
   · rfl
   · exact Real.logb_nonneg (by grind)
       (by exact_mod_cast Nat.one_le_iff_ne_zero.mpr h)
 
-@[simp] lemma φ_empty : φ .empty = 0 := rfl
+@[simp] lemma φ_empty : φ (.empty : BinaryTree α) = 0 := rfl
 
-@[simp] lemma φ_node (l : BinaryTree) (k : ℕ) (r : BinaryTree) :
+@[simp] lemma φ_node (l : BinaryTree α) (k : α) (r : BinaryTree α) :
     φ (.node l k r) = rank (.node l k r) + φ l + φ r := rfl
 
-lemma φ_nonneg : ∀ t : BinaryTree, 0 ≤ φ t
+lemma φ_nonneg : ∀ t : BinaryTree α, 0 ≤ φ t
   | .empty => le_refl _
   | .node l k r => by
       simp [φ]; linarith [rank_nonneg (.node l k r), φ_nonneg l, φ_nonneg r]
 
-lemma rank_le_of_num_nodes_le {s t : BinaryTree}
+lemma rank_le_of_num_nodes_le {s t : BinaryTree α}
     (h : s.num_nodes ≤ t.num_nodes) : rank s ≤ rank t := by
   simp only [rank]
   split_ifs with hs ht ht
@@ -756,12 +759,12 @@ lemma rank_le_of_num_nodes_le {s t : BinaryTree}
       (by exact_mod_cast Nat.one_le_iff_ne_zero.mpr hs)
       (by simp_all only [Nat.cast_le])
 
-lemma rank_eq_of_num_nodes_eq {s t : BinaryTree}
+lemma rank_eq_of_num_nodes_eq {s t : BinaryTree α}
     (h : s.num_nodes = t.num_nodes) : rank s = rank t := by
   exact le_antisymm (rank_le_of_num_nodes_le (le_of_eq h))
     (rank_le_of_num_nodes_le (le_of_eq h.symm))
 
-@[simp] lemma rank_splayBU (t : BinaryTree) (q : ℕ) :
+@[simp] lemma rank_splayBU [LinearOrder α] (t : BinaryTree α) (q : α) :
     rank (splayBU t q) = rank t :=
   rank_eq_of_num_nodes_eq (num_nodes_splayBU t q)
 
@@ -808,31 +811,41 @@ theorem log_sum_le {a b c : ℝ} (ha : 0 < a) (hb : 0 < b) (hsum : a + b ≤ c) 
 --  Potential of subtrees versus the whole tree
 -- -------------------------------------------------------------------------
 
-theorem φ_subtree_le_left (l : BinaryTree) (k : ℕ) (r : BinaryTree) :
+theorem φ_subtree_le_left (l : BinaryTree α) (k : α) (r : BinaryTree α) :
     φ l ≤ φ (.node l k r) := by
   simp [φ]; linarith [rank_nonneg (.node l k r), φ_nonneg r]
 
-theorem φ_subtree_le_right (l : BinaryTree) (k : ℕ) (r : BinaryTree) :
+theorem φ_subtree_le_right (l : BinaryTree α) (k : α) (r : BinaryTree α) :
     φ r ≤ φ (.node l k r) := by
   simp [φ]; linarith [rank_nonneg (.node l k r), φ_nonneg l]
 
-theorem φ_le_attach (c : BinaryTree) (f : Frame) : φ c ≤ φ (f.attach c) := by
-  cases f.dir <;> simp [Frame.attach, φ] <;>
-  split
-  next x heq =>
-    simp_all only [φ_node]
-    sorry
-  next x heq =>
-    simp_all only [φ_node, le_add_iff_nonneg_left]
-    sorry
+theorem φ_le_attach (c : BinaryTree α) (f : Frame α) : φ c ≤ φ (f.attach c) := by
+  cases f.dir
+  · simp only [Frame.attach]
+    split
+    next x heq =>
+      simp_all only [φ_node]
+      linarith [rank_nonneg (c.node f.key f.sibling), φ_nonneg c, φ_nonneg f.sibling]
+    next x heq =>
+      simp_all only [φ_node, le_add_iff_nonneg_left]
+      linarith [rank_nonneg (f.sibling.node f.key c), φ_nonneg c, φ_nonneg f.sibling]
+  · simp only [Frame.attach]
+    split
+    next x heq =>
+      simp_all only [φ_node]
+      linarith [rank_nonneg (c.node f.key f.sibling), φ_nonneg f.sibling, φ_nonneg c]
+    next x heq =>
+      simp_all only [φ_node, le_add_iff_nonneg_left]
+      linarith [rank_nonneg (f.sibling.node f.key c), φ_nonneg c, φ_nonneg f.sibling]
 
-theorem φ_le_reassemble (c : BinaryTree) (path : List Frame) :
+
+theorem φ_le_reassemble (c : BinaryTree α) (path : List (Frame α)) :
     φ c ≤ φ (reassemble c path) := by
   induction path generalizing c with
   | nil => simp
   | cons f rest ih => simp only [reassemble_cons]; exact le_trans (φ_le_attach c f) (ih _)
 
-theorem reassemble_descend_eq (t : BinaryTree) (q : ℕ) :
+theorem reassemble_descend_eq [LinearOrder α] (t : BinaryTree α) (q : α) :
     reassemble (descend t q).1 (descend t q).2 = t := by
   suffices ∀ acc, reassemble (descend.go q t acc).1 (descend.go q t acc).2 =
       reassemble t acc from by
@@ -848,7 +861,7 @@ theorem reassemble_descend_eq (t : BinaryTree) (q : ℕ) :
     · simp_all only [not_lt, reassemble_cons]
       rfl
 
-theorem φ_descend_subtree_le (t : BinaryTree) (q : ℕ) :
+theorem φ_descend_subtree_le [LinearOrder α] (t : BinaryTree α) (q : α) :
     φ (descend t q).1 ≤ φ t := by
   have h := reassemble_descend_eq t q
   calc φ (descend t q).1
@@ -856,15 +869,16 @@ theorem φ_descend_subtree_le (t : BinaryTree) (q : ℕ) :
         φ_le_reassemble _ _
     _ = φ t := by rw [h]
 
-theorem φ_attach_base_le (t : BinaryTree) (q : ℕ) (f : Frame) (rest : List Frame)
+theorem φ_attach_base_le [LinearOrder α] (t : BinaryTree α) (q : α)
+(f : Frame α) (rest : List (Frame α))
     (hd : descend t q = (.empty, f :: rest)) :
     φ (f.attach .empty) ≤ φ t := by
   have h := reassemble_descend_eq t q
   rw [hd] at h; simp only at h; rw [← h]
   exact φ_le_reassemble (f.attach .empty) rest
 
-theorem φ_descend_node_le (t : BinaryTree) (q : ℕ) (l : BinaryTree) (k : ℕ)
-    (r : BinaryTree) (path : List Frame) (hd : descend t q = (.node l k r, path)) :
+theorem φ_descend_node_le [LinearOrder α] (t : BinaryTree α) (q : α) (l : BinaryTree α) (k : α)
+    (r : BinaryTree α) (path : List (Frame α)) (hd : descend t q = (.node l k r, path)) :
     φ (.node l k r) ≤ φ t := by
   have h := reassemble_descend_eq t q
   rw [hd] at h; simp_all only [φ_node, ge_iff_le]; rw [← h]
@@ -881,15 +895,15 @@ theorem φ_descend_node_le (t : BinaryTree) (q : ℕ) (l : BinaryTree) (k : ℕ)
 -- For zig-zag (opp dir pair):   cost = 2, bound = 3·Δrank  (log_sum_le gives −2)
 
 /-- Zig step. -/
-theorem φ_zig (c : BinaryTree) (f : Frame) :
+theorem φ_zig (c : BinaryTree α) (f : Frame α) :
     φ (f.dir.bringUp (f.attach c)) - φ c ≤
       3 * (rank (f.dir.bringUp (f.attach c)) - rank c) := by
   cases hd : f.dir <;> simp only [hd, Dir.bringUp, Frame.attach]
   · -- L: rotateRight (.node c f.key f.sibling)
     unfold rotateRight; cases c with
     | empty =>
-      simp [φ, rank]
-      linarith [rank_nonneg (BinaryTree.node .empty f.key f.sibling)]
+      simp only [φ, rank]
+      nlinarith [φ_nonneg f.sibling, rank_nonneg (BinaryTree.node .empty f.key f.sibling)]
     | node A x B =>
       simp only [φ_node]
       have hrs : rank (BinaryTree.node A x (BinaryTree.node B f.key f.sibling)) =
@@ -921,7 +935,7 @@ theorem φ_zig (c : BinaryTree) (f : Frame) :
       linarith
 
 /-- Zig-zig step (same-direction double rotation). -/
-theorem φ_zigzig (c : BinaryTree) (f1 f2 : Frame) (heq : f1.dir = f2.dir) :
+theorem φ_zigzig (c : BinaryTree α) (f1 f2 : Frame α) (heq : f1.dir = f2.dir) :
     let step := f2.dir.bringUp (f2.dir.bringUp (f2.attach (f1.attach c)))
     φ step - φ c + 2 ≤ 3 * (rank step - rank c) := by
   intro step
@@ -1027,7 +1041,7 @@ theorem φ_zigzig (c : BinaryTree) (f1 f2 : Frame) (heq : f1.dir = f2.dir) :
       nlinarith
 
 /-- Zig-zag step (opposite-direction double rotation). -/
-theorem φ_zigzag (c : BinaryTree) (f1 f2 : Frame) (hne : f1.dir ≠ f2.dir) :
+theorem φ_zigzag (c : BinaryTree α) (f1 f2 : Frame α) (hne : f1.dir ≠ f2.dir) :
     let step := f2.dir.bringUp (applyChild f2.dir f1.dir.bringUp (f2.attach (f1.attach c)))
     φ step - φ c + 2 ≤ 3 * (rank step - rank c) := by
   intro step
@@ -1127,7 +1141,7 @@ theorem φ_zigzag (c : BinaryTree) (f1 f2 : Frame) (hne : f1.dir ≠ f2.dir) :
 --  Telescoping: potential change along the full splayUp
 -- -------------------------------------------------------------------------
 
-theorem φ_splayUp (c : BinaryTree) (path : List Frame) :
+theorem φ_splayUp (c : BinaryTree α) (path : List (Frame α)) :
     φ (splayUp c path) - φ c + path.length ≤
       3 * (rank (splayUp c path) - rank c) + 1 := by
   induction c, path using splayUp_induction with
@@ -1155,7 +1169,7 @@ theorem φ_splayUp (c : BinaryTree) (path : List Frame) :
 --  The main amortized bound
 -- -------------------------------------------------------------------------
 
-theorem splayBU_amortized_bound (t : BinaryTree) (q : ℕ) :
+theorem splayBU_amortized_bound [LinearOrder α] (t : BinaryTree α) (q : α) :
     φ (splayBU t q) - φ t + splayBU.cost t q ≤
       3 * Real.logb 2 t.num_nodes + 1 := by
   unfold splayBU.cost splayBU
