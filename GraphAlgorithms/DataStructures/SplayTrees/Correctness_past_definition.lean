@@ -9,6 +9,7 @@ Two main theorems are established:
 -/
 
 import GraphAlgorithms.DataStructures.SplayTrees.Basic
+import GraphAlgorithms.DataStructures.SplayTrees.BinaryTree
 
 set_option autoImplicit false
 
@@ -17,6 +18,9 @@ set_option autoImplicit false
 -- These lemmas say that ForallTree (a predicate holding on every
 -- node key) is closed under tree rearrangements (rotations, splay).
 -- ============================================================
+
+
+
 
 /-- ForallTree is monotone: a weaker predicate follows from a stronger one. -/
 lemma forallTree_mono {p q : ℕ → Prop} {t : BinaryTree}
@@ -73,6 +77,7 @@ lemma forallTree_rotate {p : ℕ → Prop} (rt : Rot) {t : BinaryTree}
   | .zig => exact forallTree_rotateRight h
   | .zag => exact forallTree_rotateLeft h
 
+
 /-- ForallTree is preserved by splay: every key satisfying p before still satisfies p after. -/
 lemma forallTree_splay {p : ℕ → Prop} (t : BinaryTree) (q : ℕ)
     (h : ForallTree p t) : ForallTree p (splay t q) := by
@@ -124,8 +129,7 @@ lemma forallTree_splay {p : ℕ → Prop} (t : BinaryTree) (q : ℕ)
 -- ============================================================
 
 /-- Right rotation preserves the BST invariant. -/
-lemma rotateRight_preserves_BST {t : BinaryTree} (h : IsBST t) :
-    IsBST (rotateRight t) := by
+lemma rotateRight_preserves_BST {t : BinaryTree} (h : IsBST t) : IsBST (rotateRight t) := by
   unfold rotateRight
   match t with
   | .empty => exact h
@@ -141,8 +145,7 @@ lemma rotateRight_preserves_BST {t : BinaryTree} (h : IsBST t) :
       (.node y b c hFL.right_sub h.forallTree_right hBL.right_bst h.right_bst)
 
 /-- Left rotation preserves the BST invariant. Symmetric to rotateRight. -/
-lemma rotateLeft_preserves_BST {t : BinaryTree} (h : IsBST t) :
-    IsBST (rotateLeft t) := by
+lemma rotateLeft_preserves_BST {t : BinaryTree} (h : IsBST t) : IsBST (rotateLeft t) := by
   unfold rotateLeft
   match t with
   | .empty => exact h
@@ -159,8 +162,7 @@ lemma rotateLeft_preserves_BST {t : BinaryTree} (h : IsBST t) :
       hBR.right_bst
 
 /-- Any rotation strategy preserves the BST invariant. -/
-lemma rotate_preserves_BST (rt : Rot) {t : BinaryTree} (h : IsBST t) :
-    IsBST (rotate t rt) := by
+lemma rotate_preserves_BST (rt : Rot) {t : BinaryTree} (h : IsBST t) : IsBST (rotate t rt) := by
   unfold rotate
   match rt with
   | .zigZig => exact rotateRight_preserves_BST (rotateRight_preserves_BST h)
@@ -192,8 +194,7 @@ lemma rotate_preserves_BST (rt : Rot) {t : BinaryTree} (h : IsBST t) :
 -- ============================================================
 
 /-- The splay operation preserves the BST invariant. -/
-theorem splay_preserves_BST (t : BinaryTree) (q : ℕ) (h : IsBST t) :
-    IsBST (splay t q) := by
+theorem splay_preserves_BST (t : BinaryTree) (q : ℕ) (h : IsBST t) : IsBST (splay t q) := by
   fun_induction splay
   -- Case: empty tree
   · exact h
@@ -268,8 +269,7 @@ theorem splay_preserves_BST (t : BinaryTree) (q : ℕ) (h : IsBST t) :
 -- ============================================================
 
 /-- The root of the splayed tree is the target key if it is present. -/
-theorem splay_root_of_contains (t : BinaryTree) (q : ℕ)
-    (hc : t.contains q) : ∃ l r, splay t q = .node l q r := by
+theorem splay_root_of_contains (t : BinaryTree) (q : ℕ) (hc : t.contains q) : ∃ l r, splay t q = .node l q r := by
   /-
     Each `splay` branch is either a contradiction (the `contains` hypothesis
     is impossible for that control-flow path, discharged by `simp_all`) or
