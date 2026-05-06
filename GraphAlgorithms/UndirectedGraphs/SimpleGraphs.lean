@@ -1,4 +1,5 @@
 import Mathlib.Data.Sym.Sym2
+import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 -- Undirected Graphs
 -- Authors: Sorrachai Yingchareonthawornchai
 
@@ -59,5 +60,21 @@ lemma edgeSet_sym (G : SimpleGraph α) (u v : α) (h : s(u, v) ∈ E(G)) :
     (hV : G.vertexSet = H.vertexSet)
     (hE : G.edgeSet = H.edgeSet) :
     G = H := by grind
+
+@[simp, grind] def deleteEdge [DecidableEq α] (G : SimpleGraph α) (e : Edge α) : SimpleGraph α where
+  vertexSet := G.vertexSet
+  edgeSet := G.edgeSet \ {e}
+  incidence := by grind [G.incidence]
+  loopless := by grind [G.loopless]
+
+@[simp, grind ←] lemma deleteEdge_subgraph [DecidableEq α] (G : SimpleGraph α) (e : Edge α) :
+    SimpleGraph.subgraphOf (deleteEdge G e) G := by
+  grind [deleteEdge]
+
+lemma card_edgeSet_deleteEdge [DecidableEq α] (G : SimpleGraph α) (e : Edge α)
+    (he : e ∈ G.edgeSet) :
+    (deleteEdge G e).edgeSet.card + 1 = G.edgeSet.card := by
+  simpa [deleteEdge, Finset.sdiff_singleton_eq_erase]
+    using Finset.card_erase_add_one he
 
 end SimpleGraph
