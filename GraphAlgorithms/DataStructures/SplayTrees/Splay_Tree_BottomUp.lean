@@ -98,13 +98,15 @@ def BinaryTree.mirror : BinaryTree α → BinaryTree α
 
 @[simp] lemma mirror_rotateRight (t : BinaryTree α) :
     (rotateRight t).mirror = rotateLeft t.mirror := by
-  rcases t with _ | ⟨l, k, r⟩ <;> simp only [rotateRight, BinaryTree.mirror_empty, rotateLeft]
-  rcases l with _ | ⟨ll, lk, lr⟩ <;> simp only [BinaryTree.mirror_node, BinaryTree.mirror_empty]
+  cases t; · rfl
+  rename_i l _ _
+  cases l <;> rfl
 
 @[simp] lemma mirror_rotateLeft (t : BinaryTree α) :
     (rotateLeft t).mirror = rotateRight t.mirror := by
-  rcases t with _ | ⟨l, k, r⟩ <;> simp only [rotateLeft, BinaryTree.mirror_empty, rotateRight]
-  rcases r with _ | ⟨rl, rk, rr⟩ <;> simp only [BinaryTree.mirror_node, BinaryTree.mirror_empty]
+  cases t; · rfl
+  rename_i _ _ r
+  cases r <;> rfl
 
 @[simp] lemma mirror_bringUp (d : Dir) (t : BinaryTree α) :
     (d.bringUp t).mirror = d.flip.bringUp t.mirror := by
@@ -245,36 +247,35 @@ theorem splayUp_induction
 -- =========================================================================
 
 
-@[simp, grind =]
+@[simp]
 theorem num_nodes_rotateRight (t : BinaryTree α) :
     (rotateRight t).num_nodes = t.num_nodes := by
   rcases t with _ | ⟨(_ | ⟨ll, lk, lr⟩), k, r⟩ <;>
     simp [rotateRight]; omega
 
-@[simp, grind =]
+@[simp]
 theorem num_nodes_rotateLeft (t : BinaryTree α) :
     (rotateLeft t).num_nodes = t.num_nodes := by
   have h := num_nodes_rotateRight t.mirror
   simp only [← mirror_rotateLeft, BinaryTree.num_nodes_mirror] at h; exact h
-
 
 @[simp] lemma pathNodes_nil : pathNodes ([] : List (Frame α)) = 0 := rfl
 
 @[simp] lemma pathNodes_cons (f : Frame α) (rest : List (Frame α)) :
     pathNodes (f :: rest) = f.nodes + pathNodes rest := rfl
 
-@[simp, grind =]
+@[simp]
 theorem num_nodes_Frame_attach (c : BinaryTree α) (f : Frame α) :
     (f.attach c).num_nodes = c.num_nodes + f.nodes := by
   unfold Frame.attach Frame.nodes
   cases f.dir <;> simp <;> omega
 
-@[simp, grind =]
+@[simp]
 theorem num_nodes_bringUp (d : Dir) (t : BinaryTree α) :
     (d.bringUp t).num_nodes = t.num_nodes := by
   cases d <;> simp [Dir.bringUp]
 
-@[simp, grind =]
+@[simp]
 theorem num_nodes_applyChild (d : Dir) (op : BinaryTree α → BinaryTree α)
     (hop : ∀ s, (op s).num_nodes = s.num_nodes) (t : BinaryTree α) :
     (applyChild d op t).num_nodes = t.num_nodes := by
@@ -283,7 +284,7 @@ theorem num_nodes_applyChild (d : Dir) (op : BinaryTree α → BinaryTree α)
   | node l k r =>
     cases d <;> simp [applyChild, hop]
 
-@[simp, grind =]
+@[simp]
 theorem num_nodes_applyChild_bringUp (d₁ d₂ : Dir) (t : BinaryTree α) :
     (applyChild d₁ d₂.bringUp t).num_nodes = t.num_nodes :=
   num_nodes_applyChild _ _ (num_nodes_bringUp _) _
@@ -484,33 +485,35 @@ theorem search_path_len_eq_descend_length [LinearOrder α] (t : BinaryTree α) (
 
 open BinaryTree (toKeyList)
 
-@[simp, grind =] theorem toKeyList_rotateRight (t : BinaryTree α) :
+@[simp] theorem toKeyList_rotateRight (t : BinaryTree α) :
     (rotateRight t).toKeyList = t.toKeyList := by
-  rcases t with _ | ⟨(_ | ⟨ll, lk, lr⟩), k, r⟩ <;>
-    simp [rotateRight, toKeyList]
+  cases t; · rfl
+  rename_i l _ r
+  cases l <;> simp [rotateRight, toKeyList]
 
-@[simp, grind =] theorem toKeyList_rotateLeft (t : BinaryTree α) :
+@[simp] theorem toKeyList_rotateLeft (t : BinaryTree α) :
     (rotateLeft t).toKeyList = t.toKeyList := by
-  rcases t with _ | ⟨l, k, (_ | ⟨rl, rk, rr⟩)⟩ <;>
-    simp [rotateLeft, toKeyList]
+  cases t; · rfl
+  rename_i l _ r
+  cases r <;> simp [rotateLeft, toKeyList]
 
-@[simp, grind =] theorem toKeyList_bringUp (d : Dir) (t : BinaryTree α) :
+@[simp] theorem toKeyList_bringUp (d : Dir) (t : BinaryTree α) :
     (d.bringUp t).toKeyList = t.toKeyList := by
   cases d <;> simp [Dir.bringUp]
 
-@[simp, grind =] theorem toKeyList_applyChild (d : Dir) (op : BinaryTree α → BinaryTree α)
+@[simp] theorem toKeyList_applyChild (d : Dir) (op : BinaryTree α → BinaryTree α)
     (hop : ∀ s, (op s).toKeyList = s.toKeyList) (t : BinaryTree α) :
     (applyChild d op t).toKeyList = t.toKeyList := by
   cases t with
   | empty => rfl
   | node l k r => cases d <;> simp [applyChild, toKeyList, hop]
 
-@[simp, grind =]
+@[simp]
 theorem toKeyList_applyChild_bringUp (d₁ d₂ : Dir) (t : BinaryTree α) :
     (applyChild d₁ d₂.bringUp t).toKeyList = t.toKeyList :=
   toKeyList_applyChild _ _ (toKeyList_bringUp _) _
 
-@[simp, grind =] theorem toKeyList_Frame_attach (c : BinaryTree α) (f : Frame α) :
+@[simp] theorem toKeyList_Frame_attach (c : BinaryTree α) (f : Frame α) :
     (f.attach c).toKeyList =
       (match f.dir with
         | .L => c.toKeyList ++ [f.key] ++ f.sibling.toKeyList
@@ -527,7 +530,7 @@ lemma reassemble_toKeyList_congr {c1 c2 : BinaryTree α} (path : List (Frame α)
     apply ih
     simp [h]
 
-@[simp, grind =]
+@[simp]
 theorem toKeyList_splayUp (c : BinaryTree α) (path : List (Frame α)) :
     (splayUp c path).toKeyList = (reassemble c path).toKeyList := by
   induction c, path using splayUp_induction with
@@ -538,7 +541,7 @@ theorem toKeyList_splayUp (c : BinaryTree α) (path : List (Frame α)) :
     unfold splayUp; split_ifs <;>
       (rw [ih]; apply reassemble_toKeyList_congr; simp)
 
-@[simp, grind =]
+@[simp]
 theorem toKeyList_splayBU [LinearOrder α] (t : BinaryTree α) (q : α) :
     (splayBU t q).toKeyList = t.toKeyList := by
   unfold splayBU
@@ -733,6 +736,8 @@ def rank (t : BinaryTree α) : ℝ :=
 def φ : BinaryTree α → ℝ
   | .empty => 0
   | s@(.node l _ r) => rank s + φ l + φ r
+
+end
 
 -- -------------------------------------------------------------------------
 --  The key logarithmic inequality (AM-GM for logs)
@@ -1230,10 +1235,7 @@ lemma splaySeq_succ [LinearOrder α] {m : ℕ}
 (init : BinaryTree α) (X : Fin m → α) (i : Fin m) :
     splaySeq init X i.succ = splayBU (splaySeq init X i.castSucc) (X i) := by
   unfold splaySeq
-  have h1 : i.succ.val = i.val + 1 := rfl
-  have h2 : i.castSucc.val = i.val := rfl
-  simp_all only [Fin.val_succ,
-  Fin.val_castSucc, Fin.is_lt, ↓reduceDIte, Fin.eta]
+  simp only [Fin.val_succ, Fin.val_castSucc, Fin.is_lt, ↓reduceDIte]
 
 /-- Splaying preserves the number of nodes across the entire sequence. -/
 lemma splaySeq_num_nodes [LinearOrder α] {m : ℕ}
@@ -1272,33 +1274,25 @@ lemma φ_le_n_log_n [LinearOrder α] (init : BinaryTree α) :
   induction init with
   | empty => simp [φ]
   | node l k r ihl ihr =>
-    have hl_le : l.num_nodes ≤ (BinaryTree.node l k r).num_nodes := by
-      simp [BinaryTree.num_nodes]; omega
-    have hr_le : r.num_nodes ≤ (BinaryTree.node l k r).num_nodes := by
-      simp [BinaryTree.num_nodes]
-    have h_rank : rank (BinaryTree.node l k r) =
-      Real.logb 2 (BinaryTree.node l k r).num_nodes := by
+    set t := BinaryTree.node l k r
+    have hl_le : l.num_nodes ≤ t.num_nodes := by simp [t, BinaryTree.num_nodes]; omega
+    have hr_le : r.num_nodes ≤ t.num_nodes := by simp [t, BinaryTree.num_nodes]
+    have h_rank : rank t = Real.logb 2 t.num_nodes := by
       unfold rank
-      have : (BinaryTree.node l k r).num_nodes ≠ 0 := by
-        simp [BinaryTree.num_nodes]
-      simp
-    calc φ (BinaryTree.node l k r)
-      = rank (BinaryTree.node l k r) + φ l + φ r := rfl
-      _ ≤ rank (BinaryTree.node l k r) +
-          l.num_nodes * Real.logb 2 l.num_nodes +
-          r.num_nodes * Real.logb 2 r.num_nodes := by linarith
-      _ ≤ Real.logb 2 (BinaryTree.node l k r).num_nodes +
-          l.num_nodes * Real.logb 2 (BinaryTree.node l k r).num_nodes +
-          r.num_nodes * Real.logb 2 (BinaryTree.node l k r).num_nodes := by
+      have : t.num_nodes ≠ 0 := by simp [t, BinaryTree.num_nodes]
+      simp [this]
+    calc φ t = rank t + φ l + φ r := rfl
+      _ ≤ rank t + l.num_nodes * Real.logb 2 l.num_nodes +
+                   r.num_nodes * Real.logb 2 r.num_nodes := by linarith
+      _ ≤ Real.logb 2 t.num_nodes +
+          l.num_nodes * Real.logb 2 t.num_nodes +
+          r.num_nodes * Real.logb 2 t.num_nodes := by
         rw [h_rank]
         have h1 := nat_log_le _ _ hl_le
         have h2 := nat_log_le _ _ hr_le
         linarith
-      _ = (1 + l.num_nodes + r.num_nodes : ℝ) *
-        Real.logb 2 (BinaryTree.node l k r).num_nodes := by ring
-      _ = (BinaryTree.node l k r).num_nodes *
-        Real.logb 2 (BinaryTree.node l k r).num_nodes := by
-        simp [BinaryTree.num_nodes]
+      _ = (1 + l.num_nodes + r.num_nodes : ℝ) * Real.logb 2 t.num_nodes := by ring
+      _ = t.num_nodes * Real.logb 2 t.num_nodes := by simp [t, BinaryTree.num_nodes]
 
 -- -------------------------------------------------------------------------
 -- General Sequence Cost Theorem
@@ -1372,7 +1366,7 @@ theorem splayBU_total_cost [LinearOrder α] (m : ℕ)
   · exact fun x => φ_nonneg x
 
 -- -------------------------------------------------------------------------
--- The Main Theorem
+-- The Main O(m log n + n log n) Total Cost Bound Theorem
 -- -------------------------------------------------------------------------
 
 /-- The total sequence cost is bounded by m * O(log n) plus the maximum
@@ -1392,5 +1386,3 @@ theorem nlogn_cost [LinearOrder α] (n m : ℕ) (X : Fin m → α)
   -- 3. Combine bounds
   unfold splayBU.sequence_cost
   linarith
-
-end
