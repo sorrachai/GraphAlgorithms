@@ -171,11 +171,6 @@ def splayBU [LinearOrder α] (t : BinaryTree α) (q : α) : BinaryTree α :=
   | (.empty, f :: rest) => splayUp (f.attach .empty) rest
   | (x@(.node _ _ _), path) => splayUp x path
 
-/-- Cost of a bottom-up splay: one unit per rotation, i.e. the length of the
-search path. -/
-def splayBU.cost [LinearOrder α] (t : BinaryTree α) (q : α) : ℝ :=
-  (descend t q).2.length
-
 /-- Reassemble a subtree `c` with its ancestral path `path` (deepest frame
 first) back into the original tree. -/
 def reassemble (c : BinaryTree α) (path : List (Frame α)) : BinaryTree α :=
@@ -435,6 +430,21 @@ lemma descend_go_length_le [LinearOrder α] (q : α) (t : BinaryTree α) (acc : 
 -- =========================================================================
 
 
+/-- Cost of a bottom-up splay: one unit per rotation.
+Caution: If the search fails, we do not rotate (as currently
+defined in splayBU) the empty leaf and start to rotate from
+its ancestor, so the cost is path.length - 1. -/
+def splayBU.cost [LinearOrder α] (t : BinaryTree α) (q : α) : ℝ :=
+  match descend t q with
+  | (.empty, []) => 0
+  | (.empty, _ :: rest) => rest.length
+  | (.node _ _ _, path) => path.length
+
+theorem splayBU_cost_nonneg [LinearOrder α] (t : BinaryTree α) (q : α) :
+    0 ≤ splayBU.cost t q := by
+  unfold splayBU.cost
+  split <;> simp
+
 /-- Subtrees have positive search path length. -/
 lemma search_path_len_node_pos [LinearOrder α] (l : BinaryTree α) (k : α) (r : BinaryTree α)
     (q : α) : 1 ≤ (BinaryTree.node l k r).search_path_len q := by
@@ -465,15 +475,6 @@ theorem search_path_len_eq_descend_length [LinearOrder α] (t : BinaryTree α) (
         simp only [hlt, hgt, if_false, if_true, List.length_append,
           List.length_singleton]
         rw [ihr]; omega
-
-/-- The bottom-up splay cost equals the length of the descended path
-(equivalently, the number of rotations performed). -/
-theorem splayBU_cost_eq_length [LinearOrder α] (t : BinaryTree α) (q : α) :
-    splayBU.cost t q = ((descend t q).2.length : ℝ) := rfl
-
-theorem splayBU_cost_nonneg [LinearOrder α] (t : BinaryTree α) (q : α) :
-    0 ≤ splayBU.cost t q := by
-  unfold splayBU.cost; exact Nat.cast_nonneg _
 
 
 -- =========================================================================
@@ -854,7 +855,7 @@ private lemma logb_nonneg {x : ℝ} (hx : 1 ≤ x) :
 /-- `logb 2 x ≥ 1` when `x ≥ 2`. -/
 private lemma one_le_logb {x : ℝ} (hx : 2 ≤ x) :
     1 ≤ Real.logb 2 x := by
-  rwa [Real.le_logb_iff_rpow_le (by norm_num : (1:ℝ) < 2) (by linarith),
+  rwa [Real.le_logb_iff_rpow_le (by norm_num : (1 : ℝ) < 2) (by linarith),
     show (2 : ℝ) ^ (1 : ℝ) = 2 from by norm_num]
 
 -- -------------------------------------------------------------------------
@@ -905,7 +906,7 @@ theorem φ_descend_node_le [LinearOrder α] (t : BinaryTree α) (q : α)
   exact φ_le_reassemble (.node l k r) path
 
 -- -----------------------------------------------------------------------
--- φ step potential bounds
+-- Splay step potential bounds
 -- -----------------------------------------------------------------------
 
 /-
@@ -1121,7 +1122,7 @@ theorem φ_splayUp (c : BinaryTree α) (path : List (Frame α)) :
         φ_reassemble_congr rest hnn.symm, φ_zigzag c f1 f2 hdir]
 
 -- -------------------------------------------------------------------------
---  The main amortized bound
+--  The main O(log n) amortized bound
 -- -------------------------------------------------------------------------
 
 private lemma rank_eq_logb {t : BinaryTree α}
@@ -1144,7 +1145,7 @@ private lemma num_nodes_pos_of_descend_nonempty_path
 theorem splayBU_amortized_bound [LinearOrder α]
     (t : BinaryTree α) (q : α) :
     φ (splayBU t q) - φ t + splayBU.cost t q ≤
-      3 * Real.logb 2 t.num_nodes + 2 := by
+      3 * Real.logb 2 t.num_nodes + 1 := by
   rcases hdecomp : descend t q with ⟨reached, path⟩
   have hpres := descend_preserves_tree t q
   rw [hdecomp] at hpres; simp only at hpres
@@ -1159,93 +1160,156 @@ theorem splayBU_amortized_bound [LinearOrder α]
       · left; rfl
       · right; exact ⟨f, rest, rfl, rfl, rfl⟩
     · left; rfl
-  have h_cost : splayBU.cost t q = path.length := by
-    simp [splayBU.cost, hdecomp]
-  rw [h_cost]
   rcases reached with _ | ⟨l, k, r⟩
   · -- reached = .empty
     rcases path with _ | ⟨f, rest⟩
     · -- empty tree, empty path → t is empty
       simp only [reassemble, List.foldl_nil] at hpres
       subst hpres
-      simp [splayBU, hdecomp, φ]
+      simp [splayBU, splayBU.cost, hdecomp, φ]
     · -- empty reached, non-empty path
-      have h_eq : splayBU t q =
-          splayUp (f.attach .empty) rest := by
-        simp [splayBU, hdecomp]
+      have h_cost : splayBU.cost t q = rest.length := by simp [splayBU.cost, hdecomp]
+      rw [h_cost]
+      have h_eq : splayBU t q = splayUp (f.attach .empty) rest := by simp [splayBU, hdecomp]
       rw [h_eq]
       set base := f.attach (.empty : BinaryTree α)
-      have hpres' : reassemble base rest = t := by
-        rw [← hpres]; simp [reassemble, base]
+      have hpres' : reassemble base rest = t := by rw [← hpres]; simp [reassemble, base]
       have hφ := φ_splayUp base rest
       rw [hpres'] at hφ
-      have hrank_eq : rank (splayUp base rest) =
-          rank t := by
-        have h := rank_splayBU t q
-        simp only [splayBU, hdecomp] at h; exact h
+      have hrank_eq : rank (splayUp base rest) = rank t := by
+        have h := rank_splayBU t q; simp only [splayBU, hdecomp] at h; exact h
       have hnn : t.num_nodes ≠ 0 :=
-        num_nodes_pos_of_descend_nonempty_path
-          hdecomp (List.cons_ne_nil f rest)
-      simp only [List.length_cons, Nat.cast_add,
-        Nat.cast_one]
-      calc φ (splayUp base rest) - φ t +
-              (↑rest.length + 1)
-          = 1 + (φ (splayUp base rest) - φ t +
-              ↑rest.length) := by ring
-        _ ≤ 1 + (3 * (rank (splayUp base rest) -
-              rank base) + 1) := by linarith
-        _ = 3 * (rank (splayUp base rest) -
-              rank base) + 2 := by ring
-        _ ≤ 3 * rank (splayUp base rest) + 2 := by
-            linarith [rank_nonneg base]
-        _ = 3 * Real.logb 2 t.num_nodes + 2 := by
-            rw [hrank_eq, rank_eq_logb hnn]
+        num_nodes_pos_of_descend_nonempty_path hdecomp (List.cons_ne_nil f rest)
+      calc φ (splayUp base rest) - φ t + ↑rest.length
+          ≤ 3 * (rank (splayUp base rest) - rank base) + 1 := by exact_mod_cast hφ
+        _ ≤ 3 * rank (splayUp base rest) + 1 := by linarith [rank_nonneg base]
+        _ = 3 * Real.logb 2 t.num_nodes + 1 := by rw [hrank_eq, rank_eq_logb hnn]
   · -- reached = .node l k r
-    have h_eq : splayBU t q =
-        splayUp (.node l k r) path := by
-      simp [splayBU, hdecomp]
+    have h_cost : splayBU.cost t q = path.length := by simp [splayBU.cost, hdecomp]
+    rw [h_cost]
+    have h_eq : splayBU t q = splayUp (.node l k r) path := by simp [splayBU, hdecomp]
     rw [h_eq]
     have hφ := φ_splayUp (.node l k r) path
     rw [hpres] at hφ
-    have hrank_eq :
-        rank (splayUp (.node l k r) path) = rank t := by
-      have h := rank_splayBU t q
-      simp only [splayBU, hdecomp] at h; exact h
+    have hrank_eq : rank (splayUp (.node l k r) path) = rank t := by
+      have h := rank_splayBU t q; simp only [splayBU, hdecomp] at h; exact h
     have hnn : t.num_nodes ≠ 0 := by
-      have hd := num_nodes_descend t q
-      rw [hdecomp] at hd
-      simp at hd; omega
-    calc φ (splayUp (.node l k r) path) - φ t +
-            ↑path.length
-        ≤ 3 * (rank (splayUp (.node l k r) path) -
-            rank (.node l k r)) + 1 := by
-          exact_mod_cast hφ
-      _ ≤ 3 * rank (splayUp (.node l k r) path) +
-            1 := by linarith [rank_nonneg (.node l k r)]
-      _ ≤ 3 * Real.logb 2 t.num_nodes + 2 := by
-          rw [hrank_eq, rank_eq_logb hnn]; linarith
+      have hd := num_nodes_descend t q; rw [hdecomp] at hd; simp at hd; omega
+    calc φ (splayUp (.node l k r) path) - φ t + ↑path.length
+        ≤ 3 * (rank (splayUp (.node l k r) path) - rank (.node l k r)) + 1 := by exact_mod_cast hφ
+      _ ≤ 3 * rank (splayUp (.node l k r) path) + 1 := by linarith [rank_nonneg (.node l k r)]
+      _ = 3 * Real.logb 2 t.num_nodes + 1 := by rw [hrank_eq, rank_eq_logb hnn]
 
-/-!
-# General Amortized Analysis and Splay Tree Corollary
-## General Framework
+
+-- =========================================================================
+-- §10 Sequence Cost & The O(m log n) Amortized Bound
+-- =========================================================================
+-- We define a sequence of splay operations, prove basic properties about
+-- tree size preservation and state transitions, bound the initial potential,
+-- and finally establish the classical O(m log n + n log n) total cost bound.
+
+-- -------------------------------------------------------------------------
+-- Splay Sequence
+-- -------------------------------------------------------------------------
+
+/-- A clean sequence generator for a series of splays. Evaluates the operations
+in order and returns the state of the tree at step `i`. -/
+def splaySeq [LinearOrder α] {m : ℕ} (init : BinaryTree α)
+(X : Fin m → α) : Fin (m + 1) → BinaryTree α :=
+  fun i => Nat.recOn i.val init (fun j acc =>
+    if h : j < m then splayBU acc (X ⟨j, h⟩) else acc)
+
+/-- The total cost is naturally defined as the sum of actual rotations
+performed across the generated sequence. -/
+def splayBU.sequence_cost [LinearOrder α] {m : ℕ} (init : BinaryTree α) (X : Fin m → α) : ℝ :=
+  ∑ i : Fin m, splayBU.cost (splaySeq init X i.castSucc) (X i)
+
+/-- The tree at step `i+1` is exactly the result of splaying the target key
+on the tree at step `i`. -/
+lemma splaySeq_succ [LinearOrder α] {m : ℕ}
+(init : BinaryTree α) (X : Fin m → α) (i : Fin m) :
+    splaySeq init X i.succ = splayBU (splaySeq init X i.castSucc) (X i) := by
+  unfold splaySeq
+  have h1 : i.succ.val = i.val + 1 := rfl
+  have h2 : i.castSucc.val = i.val := rfl
+  simp_all only [Fin.val_succ,
+  Fin.val_castSucc, Fin.is_lt, ↓reduceDIte, Fin.eta]
+
+/-- Splaying preserves the number of nodes across the entire sequence. -/
+lemma splaySeq_num_nodes [LinearOrder α] {m : ℕ}
+(init : BinaryTree α) (X : Fin m → α) (i : Fin (m + 1)) :
+    (splaySeq init X i).num_nodes = init.num_nodes := by
+  unfold splaySeq
+  generalize i.val = j
+  induction j with
+  | zero => rfl
+  | succ k ih =>
+    simp_all only
+    split
+    next h => simp_all only [num_nodes_splayBU]
+    next h => simp_all only [not_lt]
+
+-- -------------------------------------------------------------------------
+-- Initial Potential Bound
+-- -------------------------------------------------------------------------
+
+-- Helper to keep the induction step clean.
+private lemma nat_log_le (a b : ℕ) (hab : a ≤ b) :
+    (a : ℝ) * Real.logb 2 a ≤ (a : ℝ) * Real.logb 2 b := by
+  by_cases ha : a = 0
+  · simp [ha]
+  · have ha_pos : (0 : ℝ) < a := Nat.cast_pos.mpr (Nat.pos_of_ne_zero ha)
+    have hab_real : (a : ℝ) ≤ (b : ℝ) := Nat.cast_le.mpr hab
+    have h_log : Real.logb 2 a ≤ Real.logb 2 b :=
+      Real.logb_le_logb_of_le (by norm_num) ha_pos hab_real
+    have ha_nonneg : (0 : ℝ) ≤ a := Nat.cast_nonneg a
+    exact mul_le_mul_of_nonneg_left h_log ha_nonneg
+
+/-- Bound the maximum possible potential of any initial tree.
+The maximum rank is log₂(n), and there are n nodes, so φ ≤ n * log₂(n). -/
+lemma φ_le_n_log_n [LinearOrder α] (init : BinaryTree α) :
+    φ init ≤ init.num_nodes * Real.logb 2 init.num_nodes := by
+  induction init with
+  | empty => simp [φ]
+  | node l k r ihl ihr =>
+    have hl_le : l.num_nodes ≤ (BinaryTree.node l k r).num_nodes := by
+      simp [BinaryTree.num_nodes]; omega
+    have hr_le : r.num_nodes ≤ (BinaryTree.node l k r).num_nodes := by
+      simp [BinaryTree.num_nodes]
+    have h_rank : rank (BinaryTree.node l k r) =
+      Real.logb 2 (BinaryTree.node l k r).num_nodes := by
+      unfold rank
+      have : (BinaryTree.node l k r).num_nodes ≠ 0 := by
+        simp [BinaryTree.num_nodes]
+      simp
+    calc φ (BinaryTree.node l k r)
+      = rank (BinaryTree.node l k r) + φ l + φ r := rfl
+      _ ≤ rank (BinaryTree.node l k r) +
+          l.num_nodes * Real.logb 2 l.num_nodes +
+          r.num_nodes * Real.logb 2 r.num_nodes := by linarith
+      _ ≤ Real.logb 2 (BinaryTree.node l k r).num_nodes +
+          l.num_nodes * Real.logb 2 (BinaryTree.node l k r).num_nodes +
+          r.num_nodes * Real.logb 2 (BinaryTree.node l k r).num_nodes := by
+        rw [h_rank]
+        have h1 := nat_log_le _ _ hl_le
+        have h2 := nat_log_le _ _ hr_le
+        linarith
+      _ = (1 + l.num_nodes + r.num_nodes : ℝ) *
+        Real.logb 2 (BinaryTree.node l k r).num_nodes := by ring
+      _ = (BinaryTree.node l k r).num_nodes *
+        Real.logb 2 (BinaryTree.node l k r).num_nodes := by
+        simp [BinaryTree.num_nodes]
+
+-- -------------------------------------------------------------------------
+-- General Sequence Cost Theorem
+-- -------------------------------------------------------------------------
+
+/--
 Given a sequence of `m` operations on states with a potential
 function `Φ` such that each step satisfies
   `Φ(s_{i+1}) - Φ(s_i) + cost_i ≤ B`
-the total actual cost telescopes to at most `m * B + Φ(s₀)`.
-## Splay Tree Corollary
-Applying this to bottom-up splay with `Φ = φ` and
-`B = 3 * log₂(n) + 2`, the total cost of `m` splay
-operations on trees of at most `n` nodes is bounded by
-`m * (3 * log₂(n) + 2) + φ(t₀)`.
+the total actual cost telescopes to at most `m * B + Φ(s₀) - Φ(sₘ)`.
 -/
-
--- ---------------------------------------------------------
--- General amortized analysis
--- ---------------------------------------------------------
-
-/-- General amortized analysis telescope. If each step
-satisfies `Φ(s_{i+1}) - Φ(s_i) + cost_i ≤ B`, then the
-total cost is at most `m * B + Φ(s₀) - Φ(sₘ)`. -/
 theorem amortized_cost_bound {S : Type*} (m : ℕ)
     (s : Fin (m + 1) → S) (cost : Fin m → ℝ)
     (Φ : S → ℝ) (B : ℝ)
@@ -1273,14 +1337,9 @@ theorem amortized_cost_bound' {S : Type*} (m : ℕ)
   linarith [amortized_cost_bound m s cost Φ B hamort,
     hΦ_nonneg (s (Fin.last m))]
 
--- ---------------------------------------------------------
--- Splay tree amortized corollary
--- ---------------------------------------------------------
-
 /-- The total cost of `m` bottom-up splay operations is at
-most `m * (3 * log₂ n + 2) + φ(t₀)`, provided every tree
-has at most `n` nodes and each step satisfies
-`t(i+1) = splayBU (t i) (q i)`. -/
+most `m * (3 * log₂ n + 1) + φ(t₀)`, provided every tree
+has at most `n` nodes and each step satisfies `t(i+1) = splayBU (t i) (q i)`. -/
 theorem splayBU_total_cost [LinearOrder α] (m : ℕ)
     (t : Fin (m + 1) → BinaryTree α)
     (q : Fin m → α) (n : ℕ)
@@ -1290,10 +1349,10 @@ theorem splayBU_total_cost [LinearOrder α] (m : ℕ)
       (t i).num_nodes ≤ n) :
     ∑ i : Fin m,
       splayBU.cost (t i.castSucc) (q i) ≤
-      m * (3 * Real.logb 2 n + 2) + φ (t 0) := by
+      m * (3 * Real.logb 2 n + 1) + φ (t 0) := by
   apply amortized_cost_bound' m t
     (fun i => splayBU.cost (t i.castSucc) (q i))
-    φ (3 * Real.logb 2 n + 2)
+    φ (3 * Real.logb 2 n + 1)
   · intro i
     rw [hseq i]
     have hb := splayBU_amortized_bound
@@ -1307,9 +1366,31 @@ theorem splayBU_total_cost [LinearOrder α] (m : ℕ)
               φ (t i.castSucc) +
               splayBU.cost (t i.castSucc) (q i)
           ≤ 3 * Real.logb 2
-              (t i.castSucc).num_nodes + 2 := hb
-        _ ≤ 3 * Real.logb 2 n + 2 := by
+              (t i.castSucc).num_nodes + 1 := hb
+        _ ≤ 3 * Real.logb 2 n + 1 := by
             gcongr <;> [norm_num; exact hsize _]
   · exact fun x => φ_nonneg x
+
+-- -------------------------------------------------------------------------
+-- The Main Theorem
+-- -------------------------------------------------------------------------
+
+/-- The total sequence cost is bounded by m * O(log n) plus the maximum
+initial potential n * O(log n). -/
+theorem nlogn_cost [LinearOrder α] (n m : ℕ) (X : Fin m → α)
+    (init : BinaryTree α) (h_size : init.num_nodes = n) :
+    splayBU.sequence_cost init X ≤ m * (3 * Real.logb 2 n + 1) + n * Real.logb 2 n := by
+  -- 1. Apply the amortized bound directly to our generated sequence
+  have h_amortized := splayBU_total_cost m (splaySeq init X) X n
+    (splaySeq_succ init X)
+    (fun i => by rw [splaySeq_num_nodes, h_size])
+  -- 2. Bound the initial potential
+  have h_phi_bound : φ (splaySeq init X 0) ≤ n * Real.logb 2 n := by
+    have : splaySeq init X 0 = init := rfl
+    rw [this, ← h_size]
+    exact φ_le_n_log_n init
+  -- 3. Combine bounds
+  unfold splayBU.sequence_cost
+  linarith
 
 end
