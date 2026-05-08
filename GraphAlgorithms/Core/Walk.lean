@@ -1,206 +1,13 @@
-import Mathlib.Data.Sym.Sym2
+import GraphAlgorithms.Core.VertexSeq
 -- Authors: Sorrachai Yingchareonthawornchai and Weixuan Yuan
--- This definition of walk are well-defined for both directed and undirected simple graphs.
+-- This definition of walk is well-defined for both directed and undirected simple graphs.
 
 set_option tactic.hygienic false
 variable {α : Type*}
 
+/-! ### Walk validity -/
 
-/- VertexSeq as a non-empty seq -/
-@[grind] inductive VertexSeq (α : Type*)
-  | singleton (v : α) : VertexSeq α
-  | cons (w : VertexSeq α) (v : α) : VertexSeq α
-
-namespace VertexSeq
-
-/-! ## Basic accessors -/
-
-/- The list of vertices visited by the walk, in order. -/
-@[grind] def toList : VertexSeq α → List α
-  | .singleton v => [v]
-  | .cons p v => p.toList.cons v
-
-/-- The first node does not count in the sequence. -/
-@[grind] def length : VertexSeq α → ℕ
-  | .singleton _ => 0
-  | .cons w _ => 1 + w.length
-
-@[grind] def head : VertexSeq α → α
-  | .singleton v => v
-  | .cons w _ => head w
-
-@[grind] def tail : VertexSeq α → α
-  | .singleton v => v
-  | .cons _ v => v
-
-@[simp, grind =] lemma singleton_head_eq (u : α) :
-  (VertexSeq.singleton u).head = u := by simp [head]
-@[simp, grind =] lemma singleton_tail_eq (u : α) :
-  (VertexSeq.singleton u).tail = u := by simp [tail]
-
-@[simp, grind =] lemma con_head_eq (w : VertexSeq α) (u : α) :
-    (w.cons u).head = w.head := rfl
-
-@[simp, grind =] lemma con_tail_eq (w : VertexSeq α) (u : α) :
-    (w.cons u).tail = u := rfl
-
-@[simp, grind ←] lemma head_mem_toList (w : VertexSeq α) : w.head ∈ w.toList := by
-  induction w <;> grind [VertexSeq.head, VertexSeq.toList]
-
-/-! ## dropHead, dropTail -/
-
-@[grind] def dropHead : VertexSeq α → VertexSeq α
-  | .singleton v => .singleton v
-  | .cons (.singleton _) v => .singleton v
-  | .cons w v => .cons (dropHead w) v
-
-@[grind] def dropTail : VertexSeq α → VertexSeq α
-  | .singleton v => .singleton v
-  | .cons w _ => w
-
-/-! ## append, reverse, and their laws -/
-
-@[grind] def append : VertexSeq α → VertexSeq α → VertexSeq α
-  | w, .singleton v => .cons w v
-  | w, .cons w2 v => .cons (append w w2) v
-
-@[grind] def reverse : VertexSeq α → VertexSeq α
-  | .singleton v => .singleton v
-  | .cons w v => append (.singleton v) (reverse w)
-
-@[simp, grind =] lemma length_append (p q : VertexSeq α) :
-  (p.append q).length = p.length + q.length + 1 := by
-  fun_induction append p q <;> grind
-
-@[simp, grind =] lemma singleton_reverse_eq (v : α) :
-  (VertexSeq.singleton v).reverse = .singleton v := rfl
-
-@[simp, grind =] lemma tail_on_tail (p q : VertexSeq α) : (p.append q).tail = q.tail := by
-  fun_induction append <;> simp_all [tail]
-
-@[simp, grind =] lemma head_on_head (p q : VertexSeq α) : (p.append q).head = p.head := by
-  fun_induction append <;> simp_all
-
-@[simp, grind =] lemma tail_on_tail_singleton (p : VertexSeq α) (x : α) :
-    (p.append (.singleton x)).tail = x := by
-  unfold append
-  unfold tail
-  split <;> aesop
-
-@[simp, grind =] lemma head_on_head_singleton (p : VertexSeq α) (x : α) :
-  ((VertexSeq.singleton x).append p).head = x := by
-  unfold append
-  unfold head
-  split <;> aesop
-
-@[simp, grind =] lemma append_assoc (p q r : VertexSeq α) :
-    (p.append q).append r = p.append (q.append r) := by
-  fun_induction append q r <;> simp_all [append]
-
-@[simp, grind =] lemma reverse_append (p q : VertexSeq α) :
-    (p.append q).reverse = q.reverse.append p.reverse := by
-  fun_induction append <;> simp_all [reverse]
-
-
-@[simp, grind =] lemma reverse_reverse (p : VertexSeq α) : (p.reverse).reverse = p := by
-  fun_induction reverse p <;> aesop
-
-
-@[simp, grind =] lemma head_reverse (p : VertexSeq α) : (p.reverse).head = p.tail := by
-  fun_induction reverse p <;> aesop
-
-
-@[simp, grind =] lemma tail_reverse (p : VertexSeq α) : (p.reverse).tail = p.head := by
-  fun_induction reverse p <;> aesop
-
-@[simp, grind =] lemma dropTail_head (p : VertexSeq α) : p.dropTail.head = p.head := by
-  fun_induction reverse p <;> aesop
-
-/-! ## takeUntil, dropUntil, loopErase -/
-
-/-- Take vertices until the first occurrence of `v` (including `v`). -/
-@[simp, grind] def takeUntil [DecidableEq α] (w : VertexSeq α) (v : α)
-  (h : v ∈ w.toList) : VertexSeq α :=
-  match w with
-  | .singleton x => .singleton x
-  | .cons w2 x =>
-    if h2 : v ∈ w2.toList then takeUntil w2 v h2
-    else .cons w2 x
-
-/-- Drop vertices until the last occurrence of `v` (not including `v`). -/
-@[simp, grind] def dropUntil [DecidableEq α] (w : VertexSeq α) (v : α)
-  (h : v ∈ w.toList) : VertexSeq α :=
-  match w with
-  | .singleton x => .singleton x
-  | .cons w2 x =>
-    if h2 : v ∈ w2.toList then .cons (dropUntil w2 v h2) x
-    else .singleton x
-
-@[simp] lemma takeUntil_length_le [DecidableEq α] (w : VertexSeq α) (v : α)
-    (h : v ∈ w.toList) : (w.takeUntil v h).length ≤ w.length := by
-  fun_induction takeUntil w v h <;> grind
-
-@[simp] lemma dropUntil_length_le [DecidableEq α] (w : VertexSeq α) (v : α)
-    (h : v ∈ w.toList) : (w.dropUntil v h).length ≤ w.length := by
-  fun_induction dropUntil w v h <;> grind
-
-@[simp, grind =] lemma head_takeUntil [DecidableEq α] (w : VertexSeq α) (v : α) (h : v ∈ w.toList) :
-    (takeUntil w v h).head = w.head := by
-  induction w <;> grind
-
-@[simp, grind =] lemma tail_takeUntil [DecidableEq α] (w : VertexSeq α) (v : α) (h : v ∈ w.toList) :
-    (takeUntil w v h).tail = v := by
-  induction w <;> grind
-
-@[simp, grind →] lemma mem_takeUntil [DecidableEq α] (w : VertexSeq α)
-  (v x : α) (h : v ∈ w.toList) : x ∈ (takeUntil w v h).toList → x ∈ w.toList := by
-  induction w generalizing v <;> grind
-
-@[simp, grind =] lemma head_dropUntil [DecidableEq α] (w : VertexSeq α) (v : α)
-    (h : v ∈ w.toList) :
-    (w.dropUntil v h).head = v := by
-  induction w <;> grind
-
-@[simp, grind =] lemma tail_dropUntil [DecidableEq α] (w : VertexSeq α) (v : α)
-    (h : v ∈ w.toList) :
-    (w.dropUntil v h).tail = w.tail := by
-  fun_induction VertexSeq.dropUntil w v h <;> simp [VertexSeq.tail]
-
-
-
-@[simp, grind →] lemma mem_dropUntil [DecidableEq α] (w : VertexSeq α) (v x : α)
-    (h : v ∈ w.toList) : x ∈ (w.dropUntil v h).toList → x ∈ w.toList := by
-  induction w generalizing v <;> grind
-
-@[grind] def loopErase [DecidableEq α] : VertexSeq α → VertexSeq α
-  | .singleton v => .singleton v
-  | .cons w v =>
-      if h : v ∈ w.toList then
-        loopErase (takeUntil w v h)
-      else
-        .cons (loopErase w) v
-  termination_by p => p.length
-  decreasing_by
-  · simp [length]; grind [takeUntil_length_le]
-  · simp [length]
-
-lemma mem_loopErase [DecidableEq α] (w : VertexSeq α) :
-    ∀ {x : α}, x ∈ w.loopErase.toList → x ∈ w.toList := by
-  fun_induction loopErase w <;> grind [toList, mem_takeUntil]
-
-theorem loopErase_nodup [DecidableEq α] (w : VertexSeq α) : w.loopErase.toList.Nodup := by
-  fun_induction VertexSeq.loopErase w <;> grind [toList, mem_loopErase]
-
-@[simp] lemma head_loopErase [DecidableEq α] (w : VertexSeq α) : w.loopErase.head = w.head := by
-  fun_induction loopErase w <;> simp_all
-
-@[simp] lemma tail_loopErase [DecidableEq α] (w : VertexSeq α) : w.loopErase.tail = w.tail := by
-  fun_induction loopErase w <;> simp_all
-
-end VertexSeq
-
-/-! ## IsWalk, Walk core data -/
-
+/-- Graph-independent walk validity: adjacent vertices in the sequence are distinct. -/
 @[grind] inductive IsWalk : VertexSeq α → Prop
   | singleton (v : α) : IsWalk (.singleton v)
   | cons (w : VertexSeq α) (u : α)
@@ -211,6 +18,7 @@ end VertexSeq
 grind_pattern IsWalk.singleton => IsWalk (.singleton v)
 grind_pattern IsWalk.cons => IsWalk (.cons w u)
 
+/-- A walk is a vertex sequence bundled with graph-independent walk validity. -/
 structure Walk (α : Type*) where
   seq : VertexSeq α
   valid : IsWalk seq
@@ -218,115 +26,132 @@ structure Walk (α : Type*) where
 namespace Walk
 open VertexSeq
 
+/-- Two walks are equal when their underlying vertex sequences are equal. -/
 @[ext] lemma ext {w1 w2 : Walk α} (hseq : w1.seq = w2.seq) : w1 = w2 := by
   cases w1
   cases w2
   cases hseq
   rfl
 
-/-! ## Basic IsWalk helper lemmas -/
-
-@[simp, grind =>] lemma iswalk_prefix (w2 : VertexSeq α) (v : α)
+/-- A nontrivial valid sequence has a valid prefix. -/
+@[simp, grind =>] lemma valid_prefix (w2 : VertexSeq α) (v : α)
     (valid : IsWalk (w2.cons v)) : IsWalk w2 := by
   cases valid
   grind
 
-@[simp, grind <=] lemma tail_neq_of_iswalk (w2 : VertexSeq α) (v : α)
+/-- The final step of a valid sequence has distinct endpoints. -/
+@[simp, grind <=] lemma tail_ne_of_valid_cons (w2 : VertexSeq α) (v : α)
     (valid : IsWalk (w2.cons v)) : w2.tail ≠ v := by
   cases valid
   grind
 
+/-- Appending two valid sequences with distinct connecting endpoints is valid. -/
 @[grind ←]
-lemma is_walk_two_seqs_append_of (w1 w2 : VertexSeq α)
+lemma validSeq_append (w1 w2 : VertexSeq α)
   (h1 : IsWalk w1) (h2 : IsWalk w2) (hneq : w1.tail ≠ w2.head) :
     IsWalk (w1.append w2) := by
   fun_induction w1.append w2 <;> grind
 
+/-- Prepending a distinct vertex to the head of a valid sequence is valid. -/
 @[grind ←]
-theorem prepend_iswalk (p : VertexSeq α) (v : α) (h : IsWalk p) (h2 : p.head ≠ v) :
+theorem valid_singleton_append (p : VertexSeq α) (v : α) (h : IsWalk p) (h2 : p.head ≠ v) :
   IsWalk ((VertexSeq.singleton v).append p) := by grind
 
+/-- Reversing a valid sequence preserves validity. -/
 @[grind →, grind ←]
-lemma isWalk_rev_if (w : VertexSeq α) : IsWalk w → IsWalk w.reverse := by
+lemma valid_reverse (w : VertexSeq α) : IsWalk w → IsWalk w.reverse := by
   intro h
   induction h <;> grind
 
+/-- Validity of an appended sequence decomposes into validity and a distinct connector. -/
 @[grind →]
-theorem is_walk_neq_of_append (p q : VertexSeq α) (h : IsWalk (p.append q))
+theorem valid_append_parts (p q : VertexSeq α) (h : IsWalk (p.append q))
   : IsWalk p ∧ IsWalk q ∧ p.tail ≠ q.head := by fun_induction append <;> grind
 
+/-- Validity of a reversed sequence implies validity of the original sequence. -/
 @[grind →]
-lemma isWalk_rev_imp (w : VertexSeq α) : IsWalk w.reverse → IsWalk w := by
+lemma valid_of_reverse (w : VertexSeq α) : IsWalk w.reverse → IsWalk w := by
   fun_induction reverse <;> grind
 
+/-- Reversal preserves and reflects walk validity. -/
 @[simp, grind =]
-lemma isWalk_rev_iff (w : VertexSeq α) : IsWalk w.reverse ↔ IsWalk w := by grind
+lemma valid_reverse_iff (w : VertexSeq α) : IsWalk w.reverse ↔ IsWalk w := by grind
 
-lemma nodup_iswalk (w : VertexSeq α) (h : w.toList.Nodup) : IsWalk w := by
+/-- A duplicate-free vertex sequence is valid as a walk. -/
+@[grind →]
+lemma valid_of_nodup (w : VertexSeq α) (h : w.toList.Nodup) : IsWalk w := by
   induction w <;> grind
 
--- @[grind ←]
--- lemma prepend_iswalk' (w2 : VertexSeq α) (v : α)
---     (valid : IsWalk w2) (hneq : v ≠ w2.head) :
---   IsWalk ((VertexSeq.singleton v).append w2) := by
---   induction valid generalizing v with
---   | singleton x => grind [head, tail, append, IsWalk.singleton, IsWalk.cons]
---   | cons w u hw htail ih => grind [head, append, IsWalk.cons, tail_on_tail]
-
-
+/-- `takeUntil` preserves walk validity. -/
 @[grind →]
-lemma takeUntil_iswalk [DecidableEq α] (w : VertexSeq α) (v : α) (h : v ∈ w.toList)
+lemma valid_takeUntil [DecidableEq α] (w : VertexSeq α) (v : α) (h : v ∈ w.toList)
   (hw : IsWalk w) :
     IsWalk (w.takeUntil v h) := by
   induction hw generalizing v <;> grind
 
+/-- `dropUntil` preserves walk validity. -/
 @[grind →]
-lemma dropUntil_iswalk [DecidableEq α] (w : VertexSeq α) (v : α)
+lemma valid_dropUntil [DecidableEq α] (w : VertexSeq α) (v : α)
     (h : v ∈ w.toList) (hw : IsWalk w) :
     IsWalk (w.dropUntil v h) := by
   induction hw generalizing v <;> grind
 
-lemma loopErase_iswalk [DecidableEq α] (w : VertexSeq α) : IsWalk w.loopErase := by
-  grind [nodup_iswalk, loopErase_nodup]
+/-- Loop erasure always yields a valid walk sequence. -/
+lemma valid_loopErase [DecidableEq α] (w : VertexSeq α) : IsWalk w.loopErase := by
+  grind [valid_of_nodup, loopErase_nodup]
 
-/-! ## support, head, tail, length, dropTail for Walk -/
+/-! ### Basic walk wrappers -/
 
 /-- The list of vertices visited by the walk, in order. -/
 @[simp, grind] def support (w : Walk α) : List α := w.seq.toList
 
+/-- The first vertex of a walk. -/
 abbrev head (w : Walk α) : α := w.seq.head
+/-- The last vertex of a walk. -/
 abbrev tail (w : Walk α) : α := w.seq.tail
+/-- The number of edges represented by a walk. -/
 abbrev length (w : Walk α) : ℕ := w.seq.length
 
+/-- Drop the final vertex of a walk, leaving singleton walks unchanged. -/
 abbrev dropTail (w : Walk α) : Walk α :=
   { seq := w.seq.dropTail
     valid := by grind [Walk]}
 
+/-- Append one new final vertex to a walk. -/
 def append_single (w : Walk α) (u : α) (h : u ≠ w.tail) : Walk α :=
   ⟨w.seq.cons u, .cons w.seq u w.valid (by aesop)⟩
 
+/-- Dropping the tail preserves the head of a walk. -/
 @[simp, grind =]
 lemma dropTail_head (w : Walk α) : w.dropTail.head = w.head := by
   cases w; induction valid <;> grind
 
+/-- If dropping the tail does not change the tail, the walk has length zero. -/
 @[simp, grind .]
-lemma len_zero_of_drop_tail_eq_tail (w : Walk α) (h : w.dropTail.tail = w.tail) :
+lemma zero_of_dropTail_tail (w : Walk α) (h : w.dropTail.tail = w.tail) :
     w.length = 0 := by
   cases w; induction valid <;> grind
 
+/-- A length-zero walk has equal endpoints. -/
 @[simp, grind ←]
-lemma head_eq_tail_of_length_zero (w : Walk α) (h : w.length = 0)
+lemma endpoints_eq_of_zero (w : Walk α) (h : w.length = 0)
   : w.head = w.tail := by
   cases w; induction valid <;> grind
 
+/-- Positive-length walks lose one edge when their tail is dropped. -/
+lemma dropTail_length_succ (w : Walk α) (h : w.length ≠ 0) :
+    w.dropTail.length + 1 = w.length := by
+  cases w; induction valid <;> grind
 
-/-! ## Walk append, reverse and related lemmas -/
+/-! ### append, reverse -/
 
+/-- The raw append of two walks is valid when their endpoints are distinct. -/
 @[grind ←]
-lemma two_seqs_append_of (w1 w2 : Walk α) (hneq : w1.tail ≠ w2.head) :
+lemma valid_appendSeq (w1 w2 : Walk α) (hneq : w1.tail ≠ w2.head) :
     IsWalk (w1.seq.append w2.seq) := by
   cases w1; cases w2; grind
 
+/-- Concatenate two walks whose touching endpoints agree. -/
 @[grind =]
 def append (w1 w2 : Walk α) (h : w1.tail = w2.head) : Walk α :=
   if h1 : w1.length = 0 then w2
@@ -334,19 +159,25 @@ def append (w1 w2 : Walk α) (h : w1.tail = w2.head) : Walk α :=
     { seq := w1.dropTail.seq.append w2.seq
       valid := by grind [Walk]}
 
+/-- Reverse a walk. -/
 @[grind =]
 def reverse (w : Walk α) : Walk α :=
   { seq := w.seq.reverse
     valid := by grind [Walk]}
 
+/-- The head of a reversed walk is the original tail. -/
 @[simp, grind =] lemma head_reverse (w : Walk α) : (w.reverse).head = w.tail := by grind
+/-- The tail of a reversed walk is the original head. -/
 @[simp, grind =] lemma tail_reverse (w : Walk α) : (w.reverse).tail = w.head := by grind
-@[simp, grind =] lemma head_on_head (w1 w2 : Walk α) (h : w1.tail = w2.head) :
+/-- Appending walks preserves the head of the first walk. -/
+@[simp, grind =] lemma append_head (w1 w2 : Walk α) (h : w1.tail = w2.head) :
     (Walk.append w1 w2 h).head = w1.head := by
   cases w1; induction valid <;> grind
-@[simp, grind =] lemma tail_on_tail (w1 w2 : Walk α) (h : w1.tail = w2.head) :
+/-- Appending walks preserves the tail of the second walk. -/
+@[simp, grind =] lemma append_tail (w1 w2 : Walk α) (h : w1.tail = w2.head) :
     (Walk.append w1 w2 h).tail = w2.tail := by grind
 
+/-- The length of a walk append is the sum of lengths. -/
 @[simp, grind =] lemma length_append (w1 w2 : Walk α) (h : w1.tail = w2.head) :
     (Walk.append w1 w2 h).length = w1.length + w2.length := by
   unfold Walk.append
@@ -356,77 +187,73 @@ def reverse (w : Walk α) : Walk α :=
       cases w1; induction valid <;> grind
     grind
 
-/-! ## Path, cycle -/
+/-! ### Paths and cycles -/
 
+/-- A path is a walk whose support has no duplicate vertices. -/
 @[grind] def IsPath (w : Walk α) : Prop := w.support.Nodup
 
+/-- Turn a walk into a path by erasing loops. -/
 abbrev toPath [DecidableEq α] (w : Walk α) : Walk α :=
   { seq := w.seq.loopErase
-    valid := loopErase_iswalk w.seq }
+    valid := valid_loopErase w.seq }
 
-theorem toPath_isPath [DecidableEq α] (w : Walk α) : IsPath (toPath w) := by
-  unfold IsPath toPath support
-  simpa using loopErase_nodup w.seq
+/-- Loop erasure turns every walk into a path. -/
+theorem isPath_toPath [DecidableEq α] (w : Walk α) : IsPath (toPath w) := by grind
 
-lemma tail_toPath [DecidableEq α] (w : Walk α) : (toPath w).tail = w.tail := by
-  grind [tail_loopErase]
+/-- Dropping the tail of a path leaves a path. -/
+lemma isPath_dropTail (w : Walk α) (hPath : IsPath w) : IsPath w.dropTail := by
+  cases w with
+  | mk seq valid =>
+      cases valid <;> grind [IsPath, support, VertexSeq.toList]
 
-lemma head_toPath [DecidableEq α] (w : Walk α) : (toPath w).head = w.head := by
-  grind [head_loopErase]
+/-- Converting to a path preserves the tail. -/
+@[grind =] lemma toPath_tail [DecidableEq α] (w : Walk α) : (toPath w).tail = w.tail := by
+  grind
 
-def IsCycle (w : Walk α) : Prop :=
+/-- Converting to a path preserves the head. -/
+@[grind =] lemma toPath_head [DecidableEq α] (w : Walk α) : (toPath w).head = w.head := by
+  grind
+
+/-- A cycle is a length-at-least-three closed walk whose dropped-tail part is a path. -/
+@[grind] def IsCycle (w : Walk α) : Prop :=
   3 ≤ w.length ∧ w.head = w.tail ∧ IsPath w.dropTail
 
+/-! ### takeUntil, dropUntil -/
 
+/-- The walk prefix ending at the first occurrence of a support vertex. -/
+@[grind] def takeUntil [DecidableEq α] (w : Walk α) (u : α) (hu : u ∈ w.support) : Walk α :=
+  ⟨w.seq.takeUntil u hu, valid_takeUntil w.seq u hu w.valid⟩
 
-/-! ## Some more helper lemmas -/
-@[simp, grind .] lemma takeUntil_head_eq_singleton [DecidableEq α] (w : VertexSeq α)
-  (h : w.head ∈ w.toList) :
-  w.takeUntil w.head h = VertexSeq.singleton w.head := by
-  induction w <;> grind
+/-- The walk suffix starting at the last occurrence of a support vertex. -/
+@[grind] def dropUntil [DecidableEq α] (w : Walk α) (u : α) (hu : u ∈ w.support) : Walk α :=
+  ⟨w.seq.dropUntil u hu, valid_dropUntil w.seq u hu w.valid⟩
 
-@[simp, grind .] lemma dropUntil_head_eq_self [DecidableEq α] (w : VertexSeq α)
-  (h : w.head ∈ w.toList) :
-  w.dropUntil w.head h = w := by
-  induction w <;> grind
-
-@[simp, grind →] lemma vertex_seq_split [DecidableEq α]
-    (w : VertexSeq α) (v : α) (h : v ∈ w.toList) (hne : v ≠ w.head) :
-  (w.takeUntil v h).dropTail.append (w.dropUntil v h) = w := by
-  induction w generalizing v <;> grind
-
-@[simp, grind →] lemma walk_split [DecidableEq α]
+/-- Split a walk at a support vertex into `takeUntil` followed by `dropUntil`. -/
+@[simp, grind →] lemma split [DecidableEq α]
   (w : Walk α) (u : α) (hu : u ∈ w.support) :
-    w = Walk.append
-      ⟨w.seq.takeUntil u hu, takeUntil_iswalk w.seq u hu w.valid⟩
-      ⟨w.seq.dropUntil u hu, dropUntil_iswalk w.seq u hu w.valid⟩
-      (by grind) := by
+    w = Walk.append (w.takeUntil u hu) (w.dropUntil u hu) (by grind) := by
   by_cases h : u = w.head
   · ext; grind
   · ext; grind
 
+/-! ### Rerooting cycles -/
 
-/-! ## Re-rooting a cycle -/
 /-- Re-root a cycle at any chosen vertex in its support. -/
 @[simp, grind] def rerootCycle [DecidableEq α] (w : Walk α) (hcyc : IsCycle w)
     (u : α) (hu : u ∈ w.support) : Walk α :=
-  Walk.append
-    ⟨w.seq.dropUntil u hu, dropUntil_iswalk w.seq u hu w.valid⟩
-    ⟨w.seq.takeUntil u hu, takeUntil_iswalk w.seq u hu w.valid⟩
+  Walk.append (w.dropUntil u hu) (w.takeUntil u hu)
     (by rcases hcyc with ⟨_, hht, _⟩; grind)
 
-@[simp, grind =] lemma toList_append (p q : VertexSeq α) :
-    (p.append q).toList = q.toList ++ p.toList := by
-  induction q generalizing p <;> grind
-
-lemma append_dropTail_eq_dropTail_append (w1 w2 : Walk α) (h : w1.tail = w2.head)
+/-- Dropping the tail of an append can be pushed to the second walk. -/
+@[grind =] lemma dropTail_append (w1 w2 : Walk α) (h : w1.tail = w2.head)
   (hlen : w2.head ≠ w2.tail) :
   (Walk.append w1 w2 h).dropTail = Walk.append w1 w2.dropTail (by grind) := by
   by_cases h1 : w1.length = 0
   · grind
   · ext; cases w2; induction valid <;> grind
 
-lemma isCycle_rerootCycle [DecidableEq α] (w : Walk α) (hcyc : IsCycle w)
+/-- Rerooting a cycle at a support vertex preserves the cycle property. -/
+@[grind →] lemma isCycle_reroot [DecidableEq α] (w : Walk α) (hcyc : IsCycle w)
   (u : α) (hu : u ∈ w.support) :
   IsCycle (rerootCycle w hcyc u hu):= by
   have h2 : w.length = (w.rerootCycle hcyc u hu).length := by grind
@@ -437,6 +264,18 @@ lemma isCycle_rerootCycle [DecidableEq α] (w : Walk α) (hcyc : IsCycle w)
   · by_cases h : u = w.head
     · have hz : w.length ≠ 0 := by omega
       grind
-    · grind [append_dropTail_eq_dropTail_append]
+    · grind
+
+/-- Length-zero walks with the same head are equal. -/
+@[grind →] lemma eq_of_zero {p q : Walk α}
+    (hp0 : p.length = 0) (hq0 : q.length = 0) (hhead : p.head = q.head) :
+    p = q := by cases p; cases q; grind
+
+/-- Positive-length walks are equal when their dropped tails and tails agree. -/
+@[grind →] lemma eq_of_parts {p q : Walk α}
+    (hp : p.length ≠ 0) (hq : q.length ≠ 0)
+    (hdrop : p.dropTail = q.dropTail) (htail : p.tail = q.tail) :
+    p = q := by cases p; cases q; grind
+
 
 end Walk
