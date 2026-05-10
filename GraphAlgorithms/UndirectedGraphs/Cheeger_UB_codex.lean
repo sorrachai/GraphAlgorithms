@@ -1675,7 +1675,7 @@ lemma lemma3 (G : SimpleGraph α) (d : ℕ) (x : α → ℝ) (h_d_pos : d ≠ 0)
   obtain ⟨y, h_pos, h_y_pos, h_supp, h_rayleigh, h_sweep_subset⟩ :=
     lemma_5_exists_median_split_witness G x d hV h_d_pos h_x_ne h_orth h_reg
   obtain ⟨t, ht_pos, hSt_ne, h_lem_4⟩ :=
-    lemma_4_sweep_threshold_expansion_bound G d y hV h_d_pos h_reg h_pos h_y_pos h_supp
+    lemma_4_sweep_threshold_expansion_bound G d y h_d_pos h_reg h_pos h_y_pos
   -- From lemma_5, there exists a specific S_t in sweepCuts G x
   -- that corresponds to the threshold t of y.
   let h_exists := h_sweep_subset t ht_pos
