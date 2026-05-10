@@ -17,6 +17,7 @@ import Mathlib.MeasureTheory.MeasurableSpace.Basic
 import GraphAlgorithms.UndirectedGraphs.Cuts
 import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
 import GraphAlgorithms.UndirectedGraphs.Expansion
+import GraphAlgorithms.UndirectedGraphs.Fiedler
 
 namespace SimpleGraph
 
@@ -25,252 +26,6 @@ open ProbabilityTheory MeasureTheory
 open Cuts
 
 variable {α : Type*} [DecidableEq α]
-
-noncomputable def restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) : α → ℝ :=
-  fun v => if v ∈ V(G) then x v else 0
-
-lemma energy_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
-    G.energy (restrictToVertexSet G x) = G.energy x := by
-  classical
-  unfold energy restrictToVertexSet
-  apply Finset.sum_congr rfl
-  intro e he
-  induction e using Sym2.ind
-  case h u v =>
-    have huV : u ∈ V(G) := G.incidence s(u, v) he u (Sym2.mem_mk_left u v)
-    have hvV : v ∈ V(G) := G.incidence s(u, v) he v (Sym2.mem_mk_right u v)
-    simp [huV, hvV]
-
-lemma deg_norm_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
-    G.deg_norm (restrictToVertexSet G x) = G.deg_norm x := by
-  classical
-  unfold deg_norm restrictToVertexSet
-  apply Finset.sum_congr rfl
-  intro v hv
-  simp [hv]
-
-lemma rayleighQuotient_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
-    G.rayleighQuotient (restrictToVertexSet G x) = G.rayleighQuotient x := by
-  rw [rQ_eq_energy_div_norm, rQ_eq_energy_div_norm]
-  rw [energy_restrictToVertexSet, deg_norm_restrictToVertexSet]
-
-lemma orthogonalVectors_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ)
-    (horth : x ∈ orthogonalVectors G) :
-    restrictToVertexSet G x ∈ orthogonalVectors G := by
-  classical
-  rcases horth with ⟨horth, hne⟩
-  constructor
-  · unfold restrictToVertexSet
-    rw [show (∑ v ∈ V(G), ↑(#δ(G,v)) * (if v ∈ V(G) then x v else 0)) =
-        ∑ v ∈ V(G), ↑(#δ(G,v)) * x v by
-      apply Finset.sum_congr rfl
-      intro v hv
-      simp [hv]]
-    exact horth
-  · rcases hne with ⟨v, hv, hxv⟩
-    exact ⟨v, hv, by simpa [restrictToVertexSet, hv] using hxv⟩
-
-lemma energy_mul (G : SimpleGraph α) (x : α → ℝ) (c : ℝ) :
-    G.energy (fun v => c * x v) = c ^ 2 * G.energy x := by
-  classical
-  unfold energy
-  rw [Finset.mul_sum]
-  apply Finset.sum_congr rfl
-  intro e he
-  induction e using Sym2.ind
-  case h u v =>
-    simp
-    ring_nf
-
-lemma deg_norm_mul (G : SimpleGraph α) (x : α → ℝ) (c : ℝ) :
-    G.deg_norm (fun v => c * x v) = c ^ 2 * G.deg_norm x := by
-  classical
-  unfold deg_norm
-  rw [Finset.mul_sum]
-  apply Finset.sum_congr rfl
-  intro v hv
-  ring
-
-lemma rayleighQuotient_mul (G : SimpleGraph α) (x : α → ℝ) {c : ℝ} (hc : c ≠ 0) :
-    G.rayleighQuotient (fun v => c * x v) = G.rayleighQuotient x := by
-  rw [rQ_eq_energy_div_norm, rQ_eq_energy_div_norm]
-  rw [energy_mul, deg_norm_mul]
-  field_simp [pow_ne_zero 2 hc]
-
-/-
-TODO
-1. Np_ne_zero
-2. median property, h_m_pos
-3. prove sweepCuts
-4. lemma 3 -> cheeger ub
-5. lemma 4
-6. fact 2
-
-Possible spin-off mini projects
-1. min S <= min T  <=> ∀ x ∈ T, ∃ y ∈ S
-2. probabilistic methods in lean
-
--/
-
--- Generates the set of all prefix and suffix cuts (sweep cuts) for a vector x.
-noncomputable def sweepCuts (G : SimpleGraph α) (x : α → ℝ) : Finset (Finset α) :=
-  by
-    classical
-    let sortedV := (V(G).toList).mergeSort (fun u v => x u ≤ x v)
-    let n := (V(G)).card
-    let indices := List.range (n / 2)
-    let prefixes := indices.map (fun k => (sortedV.take (k + 1)).toFinset)
-    let suffixes := indices.map (fun k => (sortedV.reverse.take (k + 1)).toFinset)
-    let lowerLevels :=
-      (V(G).powerset).filter
-        (fun S => S.Nonempty ∧ 2 * S.card ≤ n ∧ ∃ t : ℝ, S = V(G).filter (fun v => x v ≤ t))
-    let upperLevels :=
-      (V(G).powerset).filter
-        (fun S => S.Nonempty ∧ 2 * S.card ≤ n ∧ ∃ t : ℝ, S = V(G).filter (fun v => x v ≥ t))
-    exact (prefixes ++ suffixes).toFinset ∪ (lowerLevels ∪ upperLevels)
-
-lemma sweepCut_is_subset (G : SimpleGraph α) (x : α → ℝ) :
-    ∀ S ∈ sweepCuts G x, S ⊆ V(G) := by
-  intro S hS
-  unfold sweepCuts at hS
-  simp only [Finset.mem_union, List.mem_toFinset, List.mem_append, List.mem_map, List.mem_range,
-    Finset.mem_filter, Finset.mem_powerset] at hS
-  intro v hv
-  rcases hS with (⟨k, hk, rfl⟩ | ⟨k, hk, rfl⟩) | hLevels
-  · rw [List.mem_toFinset] at hv
-    have h_mem_sorted : v ∈ (V(G).toList).mergeSort (fun u v => x u ≤ x v) := by
-      apply List.mem_of_mem_take hv
-    rw [List.mem_mergeSort] at h_mem_sorted
-    rw [← Finset.mem_toList]
-    exact h_mem_sorted
-  · rw [List.mem_toFinset] at hv
-    have h_mem_rev : v ∈ ((V(G).toList).mergeSort (fun u v => x u ≤ x v)).reverse := by
-      apply List.mem_of_mem_take hv
-    have h_mem_sorted : v ∈ (V(G).toList).mergeSort (fun u v => x u ≤ x v) := by
-      simpa using List.mem_reverse.mp h_mem_rev
-    rw [List.mem_mergeSort] at h_mem_sorted
-    rw [← Finset.mem_toList]
-    exact h_mem_sorted
-  · rcases hLevels with hLower | hUpper
-    · exact hLower.1 hv
-    · exact hUpper.1 hv
-
-lemma sweepCuts_are_nonempty (G : SimpleGraph α) (hV : 2 ≤ (V(G)).card) (x : α → ℝ) :
-    ∀ S ∈ sweepCuts G x, S.Nonempty := by
-  intro S hS
-  unfold sweepCuts at hS
-  simp only [Finset.mem_union, List.mem_toFinset, List.mem_append, List.mem_map, List.mem_range,
-    Finset.mem_filter, Finset.mem_powerset] at hS
-  rcases hS with (⟨k, hk, rfl⟩ | ⟨k, hk, rfl⟩) | hLevels
-  · rw [Finset.nonempty_iff_ne_empty, ne_eq, List.toFinset_eq_empty_iff]
-    intro h_empty
-    have h_list_len : 1 ≤ ((V(G)).toList.mergeSort (fun u v => x u ≤ x v)).length := by
-      rw [List.length_mergeSort, Finset.length_toList]
-      omega
-    simp_all only [List.take_eq_nil_iff, Nat.add_eq_zero_iff, one_ne_zero, and_false, false_or,
-      List.length_nil, nonpos_iff_eq_zero]
-  · rw [Finset.nonempty_iff_ne_empty, ne_eq, List.toFinset_eq_empty_iff]
-    intro h_empty
-    have h_list_len : 1 ≤ (((V(G)).toList.mergeSort (fun u v => x u ≤ x v)).reverse).length := by
-      rw [List.length_reverse, List.length_mergeSort, Finset.length_toList]
-      omega
-    simp_all only [List.take_eq_nil_iff, Nat.add_eq_zero_iff, one_ne_zero, and_false,
-      false_or, List.length_nil, nonpos_iff_eq_zero]
-  · rcases hLevels with hLower | hUpper
-    · exact hLower.2.1
-    · exact hUpper.2.1
-
-lemma sweepCuts_expansion_nonempty (G : SimpleGraph α) (d : ℕ) (x : α → ℝ)
-    (hV : 2 ≤ (V(G)).card) :
-    ((sweepCuts G x).image (fun S => edgeExpansion G d S)).Nonempty := by
-  rw [Finset.image_nonempty]
-  refine ⟨(List.take (0 + 1) ((V(G)).toList.mergeSort
-    (fun u v => x u ≤ x v))).toFinset, ?_⟩
-  unfold sweepCuts
-  simp only [Finset.mem_union, List.mem_toFinset, List.mem_append, List.mem_map]
-  left
-  left
-  refine ⟨0, ?_, rfl⟩
-  rw [List.mem_range]
-  exact Nat.div_pos hV (by norm_num)
-
-lemma sweepCut_card_le_half (G : SimpleGraph α) (x : α → ℝ) :
-    ∀ S ∈ sweepCuts G x, 2 * S.card ≤ (V(G)).card := by
-  intro S hS
-  unfold sweepCuts at hS
-  simp only [Finset.mem_union, List.mem_toFinset, List.mem_append, List.mem_map, List.mem_range,
-    Finset.mem_filter, Finset.mem_powerset] at hS
-  rcases hS with (⟨k, hk, rfl⟩ | ⟨k, hk, rfl⟩) | hLevels
-  · have h_card :
-        ((List.take (k + 1) ((V(G)).toList.mergeSort
-          (fun u v => x u ≤ x v))).toFinset).card ≤ k + 1 := by
-      calc
-        ((List.take (k + 1) ((V(G)).toList.mergeSort
-          (fun u v => x u ≤ x v))).toFinset).card
-            ≤ (List.take (k + 1) ((V(G)).toList.mergeSort
-                (fun u v => x u ≤ x v))).length := by
-              exact List.toFinset_card_le _
-        _ ≤ k + 1 := by simp
-    have hk' : k + 1 ≤ (V(G)).card / 2 := by omega
-    omega
-  · have h_card :
-        ((List.take (k + 1) ((V(G)).toList.mergeSort
-          (fun u v => x u ≤ x v)).reverse).toFinset).card ≤ k + 1 := by
-      calc
-        ((List.take (k + 1) ((V(G)).toList.mergeSort
-          (fun u v => x u ≤ x v)).reverse).toFinset).card
-            ≤ (List.take (k + 1) ((V(G)).toList.mergeSort
-                (fun u v => x u ≤ x v)).reverse).length := by
-              exact List.toFinset_card_le _
-        _ ≤ k + 1 := by simp
-    have hk' : k + 1 ≤ (V(G)).card / 2 := by omega
-    omega
-  · rcases hLevels with hLower | hUpper
-    · exact hLower.2.2.1
-    · exact hUpper.2.2.1
-
-/-- The expansion of the best cut found by Fiedler's algorithm.
-    Requires |V| ≥ 2 to ensure at least one cut exists. -/
-noncomputable def fiedlerExpansion (G : SimpleGraph α) (d : ℕ) (x : α → ℝ)
-    (hV : 2 ≤ (V(G)).card) : ℝ :=
-  let cuts := sweepCuts G x
-  (cuts.image (fun S => edgeExpansion G d S)).min' (by
-    exact sweepCuts_expansion_nonempty G d x hV
-  )
-
-/-- The actual set of vertices (cut) that achieves the fiedlerExpansion. -/
-noncomputable def fiedlerCut (G : SimpleGraph α) (d : ℕ) (x : α → ℝ)
-    (hV : 2 ≤ (V(G)).card) : Finset α :=
-  -- Pick a cut that attains the minimum expansion
-  Classical.choose (Finset.mem_image.mp (Finset.min'_mem _ (sweepCuts_expansion_nonempty G d x hV)))
-
-
-lemma fiedlerCut_mem_sweep (G : SimpleGraph α) (d : ℕ) (x : α → ℝ) (hV : 2 ≤ (V(G)).card) :
-  fiedlerCut G d x hV ∈ sweepCuts G x := by
-  unfold fiedlerCut
-  -- Classical.choose_spec retrieves the property:
-  -- S ∈ sweepCuts ∧ edgeExpansion G d S = fiedlerExpansion G d x hV
-  exact (Classical.choose_spec (Finset.mem_image.mp (
-      Finset.min'_mem _ (sweepCuts_expansion_nonempty G d x hV)
-    ))).1
-
-lemma fiedlerCut_nonempty (G : SimpleGraph α) (d : ℕ) (x : α → ℝ) (hV : 2 ≤ (V(G)).card) :
-    (fiedlerCut G d x hV).Nonempty := by
-  let S_f := fiedlerCut G d x hV
-  have hS_mem : S_f ∈ sweepCuts G x := fiedlerCut_mem_sweep G d x hV
-  apply sweepCuts_are_nonempty G hV x
-  exact hS_mem
-
-lemma fiedlerCut_is_subset (G : SimpleGraph α) (d : ℕ) (x : α → ℝ) (hV : 2 ≤ (V(G)).card) :
-  fiedlerCut G d x hV ⊆ V(G) := by
-  apply sweepCut_is_subset G x
-  exact fiedlerCut_mem_sweep G d x hV
-
-lemma fiedlerCut_card_le_half (G : SimpleGraph α) (d : ℕ) (x : α → ℝ)
-    (hV : 2 ≤ (V(G)).card) :
-    2 * (fiedlerCut G d x hV).card ≤ (V(G)).card := by
-  apply sweepCut_card_le_half G x
-  exact fiedlerCut_mem_sweep G d x hV
 
 lemma sum_sq_pos (G : SimpleGraph α) (x : α → ℝ)
     (h_x_ne : ∃ v ∈ V(G), x v ≠ 0) : 0 < ∑ i ∈ V(G), x i ^ 2 := by
@@ -421,7 +176,7 @@ lemma median_shift_rayleigh_le (G : SimpleGraph α) (x : α → ℝ) (d : ℕ)
           rw [← Finset.mul_sum]
           simp [h_sum_x]
         rw [h_cross]
-        simp
+        simp only [sub_zero, sum_const, nsmul_eq_mul, le_add_iff_nonneg_right, ge_iff_le]
         positivity
       _ = V(G).sum (fun v => (x v - m) ^ 2) := rfl
   have h_num : G.energy (fun v => x v - m) = G.energy x := by
@@ -701,9 +456,12 @@ lemma shifted_part_level_mem_sweepCuts (G : SimpleGraph α) (x : α → ℝ) (m 
       intro v hv
       exact (Finset.mem_filter.mp hv).1, h_nonempty, h_card, ⟨m - t, h_level⟩⟩
 
-/-- Package the median split into exactly the witness needed by `lemma_5`. -/
-lemma exists_median_split_witness (G : SimpleGraph α) (x : α → ℝ) (d : ℕ)
-    (hV : 2 ≤ (V(G)).card)
+/-- Median-splitting lemma used by the sweep proof.
+It produces a nonzero nonnegative vector with small support, no larger Rayleigh quotient,
+and level sets that are valid sweep cuts of `x`. -/
+-- exists_median_split_witness
+lemma lemma_5_exists_median_split_witness (G : SimpleGraph α)
+    (x : α → ℝ) (d : ℕ) (hV : 2 ≤ (V(G)).card)
     (h_d_pos : d ≠ 0) (h_x_ne : ∃ v ∈ V(G), x v ≠ 0)
     (h_orth : V(G).sum (fun v => (deg(G,v) : ℝ) * x v) = 0)
     (h_reg : ∀ v ∈ V(G), #δ(G,v) = d) :
@@ -714,6 +472,7 @@ lemma exists_median_split_witness (G : SimpleGraph α) (x : α → ℝ) (d : ℕ
       rayleighQuotient G y ≤ rayleighQuotient G x ∧
       (∀ t > 0, ({v ∈ V(G) | y v ≥ t} : Finset α).Nonempty →
         {v ∈ V(G) | y v ≥ t} ∈ sweepCuts G x) := by
+  -- exact exists_median_split_witness G x d hV h_d_pos h_x_ne h_orth h_reg
   obtain ⟨m, h_upper, h_lower⟩ := exists_balanced_median G x hV
   have h_shift_ne : ∃ v ∈ V(G), x v - m ≠ 0 := by
     by_contra h_no
@@ -761,22 +520,6 @@ lemma exists_median_split_witness (G : SimpleGraph α) (x : α → ℝ) (d : ℕ
     hy_ray_shift.trans (median_shift_rayleigh_le G x d m h_d_pos h_x_ne h_orth h_reg)
   exact ⟨y, hy_nonneg, hy_pos, hy_support, hy_ray_x,
     shifted_part_level_mem_sweepCuts G x m y hy_side hy_support⟩
-
-/-- Median-splitting lemma used by the sweep proof.
-It produces a nonzero nonnegative vector with small support, no larger Rayleigh quotient,
-and level sets that are valid sweep cuts of `x`. -/
-lemma lemma_5 (G : SimpleGraph α) (x : α → ℝ) (d : ℕ) (hV : 2 ≤ (V(G)).card)
-    (h_d_pos : d ≠ 0) (h_x_ne : ∃ v ∈ V(G), x v ≠ 0)
-    (h_orth : V(G).sum (fun v => (deg(G,v) : ℝ) * x v) = 0)
-    (h_reg : ∀ v ∈ V(G), #δ(G,v) = d) :
-    ∃ y : α → ℝ,
-      (∀ v, 0 ≤ y v) ∧
-      (∃ v ∈ V(G), 0 < y v) ∧
-      (2 * (V(G).filter (fun v => y v > 0)).card ≤ V(G).card) ∧
-      rayleighQuotient G y ≤ rayleighQuotient G x ∧
-      (∀ t > 0, ({v ∈ V(G) | y v ≥ t} : Finset α).Nonempty →
-        {v ∈ V(G) | y v ≥ t} ∈ sweepCuts G x) := by
-  exact exists_median_split_witness G x d hV h_d_pos h_x_ne h_orth h_reg
 
 /-- Lemma 4: For a non-negative vector y, there exists a threshold t such that
     the expansion of the set S_t = {v : y_v ≥ t} is at most sqrt(2 * R_L(y)). -/
@@ -961,8 +704,7 @@ lemma sum_coareaWeight_eq_max_sq_or_zero (levels : Finset ℝ) :
     · rw [dif_neg hs]
       ring
 
-lemma sum_coareaWeight_le_value_sq {levels : Finset ℝ} {a : ℝ}
-    (ha_nonneg : 0 ≤ a) :
+lemma sum_coareaWeight_le_value_sq {levels : Finset ℝ} {a : ℝ} :
     ∑ t ∈ levels.filter (fun t => t ≤ a), coareaWeight (levels.filter (fun t => t ≤ a)) t =
       if h : (levels.filter (fun t => t ≤ a)).Nonempty then
         ((levels.filter (fun t => t ≤ a)).max' h) ^ 2
@@ -1826,23 +1568,6 @@ lemma level_coarea_counting (G : SimpleGraph α) (d : ℕ) (y : α → ℝ)
   · simpa [levels, w] using level_coarea_cut_bound G d y h_reg h_pos
   · simpa [levels, w] using level_coarea_volume_identity G d y h_reg h_pos
 
-/-- Volume coarea counting for the same finite sweep levels and weights
-provided by `level_coarea_counting`. -/
-lemma volume_coarea_counting (G : SimpleGraph α) (d : ℕ) (y : α → ℝ)
-    (h_reg : ∀ v ∈ V(G), #δ(G,v) = d)
-    (levels : Finset ℝ) (w : ℝ → ℝ)
-    (h_levels_pos : ∀ t ∈ levels, 0 < t)
-    (h_weights_pos : ∀ t ∈ levels, 0 < w t)
-    (h_levels_nonempty : levels.Nonempty)
-    (h_level_sets_nonempty :
-      ∀ t ∈ levels, (V(G).filter (fun v => y v ≥ t)).Nonempty)
-    (h_volume :
-      ∑ t ∈ levels, w t * ((d * (V(G).filter (fun v => y v ≥ t)).card : ℕ) : ℝ) =
-        G.deg_norm y) :
-    ∑ t ∈ levels, w t * ((d * (V(G).filter (fun v => y v ≥ t)).card : ℕ) : ℝ) =
-      G.deg_norm y := by
-  exact h_volume
-
 /-- Cauchy-Schwarz step in the sweep proof, converting the coarea numerator
 bound into a Rayleigh-quotient bound. -/
 lemma coarea_bound_to_rayleigh (G : SimpleGraph α) (y : α → ℝ)
@@ -1882,21 +1607,14 @@ lemma coarea_bound_to_rayleigh (G : SimpleGraph α) (y : α → ℝ)
         ≤ Real.sqrt (2 * G.energy y * G.deg_norm y) := h_level_bound
     _ = Real.sqrt (2 * (G.energy y / G.deg_norm y)) * G.deg_norm y := h_sqrt_eq
 
-lemma sweep_threshold_expansion_bound (G : SimpleGraph α) (d : ℕ) (y : α → ℝ)
-    (hV : 2 ≤ (V(G)).card)
-    (h_d_pos : d ≠ 0) (h_reg : ∀ v ∈ V(G), #δ(G,v) = d)
-    (h_pos : ∀ v, 0 ≤ y v)
-    (h_y_pos : ∃ v ∈ V(G), 0 < y v)
-    (h_supp : 2 * (V(G).filter (fun v => y v > 0)).card ≤ V(G).card) :
+lemma lemma_4_sweep_threshold_expansion_bound (G : SimpleGraph α)
+    (d : ℕ) (y : α → ℝ) (h_d_pos : d ≠ 0) (h_reg : ∀ v ∈ V(G), #δ(G,v) = d)
+    (h_pos : ∀ v, 0 ≤ y v) (h_y_pos : ∃ v ∈ V(G), 0 < y v) :
     ∃ t > 0,
       let S_t := V(G).filter (fun v => y v ≥ t)
       S_t.Nonempty ∧ edgeExpansion G d S_t ≤ Real.sqrt (2 * rayleighQuotient G y) := by
   obtain ⟨levels, w, hlevels_ne, hlevels_pos, hw_pos, hlevel_sets_ne, hlevel_bound,
-      hvolume_raw⟩ :=
-    level_coarea_counting G d y h_reg h_pos h_y_pos
-  have hvolume :=
-    volume_coarea_counting G d y h_reg levels w hlevels_pos hw_pos hlevels_ne
-      hlevel_sets_ne hvolume_raw
+    hvolume_raw⟩ := level_coarea_counting G d y h_reg h_pos h_y_pos
   have h_norm_pos : 0 < G.deg_norm y := by
     rw [deg_norm_eq_sum_reg G y d h_reg, ← Finset.mul_sum]
     apply mul_pos
@@ -1908,7 +1626,7 @@ lemma sweep_threshold_expansion_bound (G : SimpleGraph α) (d : ℕ) (y : α →
       ∑ t ∈ levels, w t * (Cut G (V(G).filter (fun v => y v ≥ t))).card ≤
         Real.sqrt (2 * G.rayleighQuotient y) *
           ∑ t ∈ levels, w t * ((d * (V(G).filter (fun v => y v ≥ t)).card : ℕ) : ℝ) :=
-    coarea_bound_to_rayleigh G y d levels w h_norm_pos hlevel_bound hvolume
+    coarea_bound_to_rayleigh G y d levels w h_norm_pos hlevel_bound hvolume_raw
   obtain ⟨t, ht_mem, ht_denom_pos, ht_ratio⟩ :=
     exists_ratio_le_of_sum_le levels
       (fun t => w t * (Cut G (V(G).filter (fun v => y v ≥ t))).card)
@@ -1940,18 +1658,6 @@ lemma sweep_threshold_expansion_bound (G : SimpleGraph α) (d : ℕ) (y : α →
   rw [hratio_eq] at ht_ratio
   simpa [Nat.cast_mul] using ht_ratio
 
-lemma lemma_4 (G : SimpleGraph α) (d : ℕ) (y : α → ℝ) (hV : 2 ≤ (V(G)).card)
-    (h_d_pos : d ≠ 0) (h_reg : ∀ v ∈ V(G), #δ(G,v) = d)
-    (h_pos : ∀ v, 0 ≤ y v)
-    (h_y_pos : ∃ v ∈ V(G), 0 < y v)
-    (h_supp : 2 * (V(G).filter (fun v => y v > 0)).card ≤ V(G).card) :
-    ∃ t > 0,
-      let S_t := V(G).filter (fun v => y v ≥ t)
-      S_t.Nonempty ∧ edgeExpansion G d S_t ≤ Real.sqrt (2 * rayleighQuotient G y) := by
-  exact sweep_threshold_expansion_bound G d y hV h_d_pos h_reg h_pos h_y_pos h_supp
-
-
-
 
 lemma lemma3 (G : SimpleGraph α) (d : ℕ) (x : α → ℝ) (h_d_pos : d ≠ 0)
     (hV : 2 ≤ (V(G)).card) (h_reg : ∀ v ∈ V(G), #δ(G,v) = d)
@@ -1967,9 +1673,9 @@ lemma lemma3 (G : SimpleGraph α) (d : ℕ) (x : α → ℝ) (h_d_pos : d ≠ 0)
   have hS_sub : S_f ⊆ V(G) := fiedlerCut_is_subset G d x hV
   -- 2. Use Lemma 5 and Lemma 4 to establish the existence of a good threshold cut
   obtain ⟨y, h_pos, h_y_pos, h_supp, h_rayleigh, h_sweep_subset⟩ :=
-    lemma_5 G x d hV h_d_pos h_x_ne h_orth h_reg
+    lemma_5_exists_median_split_witness G x d hV h_d_pos h_x_ne h_orth h_reg
   obtain ⟨t, ht_pos, hSt_ne, h_lem_4⟩ :=
-    lemma_4 G d y hV h_d_pos h_reg h_pos h_y_pos h_supp
+    lemma_4_sweep_threshold_expansion_bound G d y hV h_d_pos h_reg h_pos h_y_pos h_supp
   -- From lemma_5, there exists a specific S_t in sweepCuts G x
   -- that corresponds to the threshold t of y.
   let h_exists := h_sweep_subset t ht_pos

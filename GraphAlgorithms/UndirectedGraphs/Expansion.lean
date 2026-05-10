@@ -1,25 +1,20 @@
 import Mathlib.Tactic
 import Mathlib.Order.WithBot
 import Mathlib.Data.Sym.Sym2
-import Mathlib.Data.Sym.Sym2.Order
 import Mathlib.Data.Real.Basic
 import Mathlib.Data.Finset.Basic
 
-import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
 import GraphAlgorithms.UndirectedGraphs.Cuts
+import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
 
 -- Cuts and contractions (undirected simple)
--- Authors: Yuchen Zhong
--- Vibe coding assist by Gemini
+-- Authors: Yuchen Zhong, Weixuan Yuan
+-- LLM: Gemini, GPT-5.5 on codex
 
 set_option tactic.hygienic false
 
-variable {α : Type*} [DecidableEq α]
-
 open Finset
-open SimpleGraph Cuts
-
-variable {V : Type*} [Fintype V] [DecidableEq V]
+open Cuts
 
 namespace SimpleGraph
 
@@ -108,6 +103,18 @@ lemma energy_nonneg (G : SimpleGraph α) (x : α → ℝ) :
     dsimp
     apply sq_nonneg
 
+lemma energy_mul (G : SimpleGraph α) (x : α → ℝ) (c : ℝ) :
+    G.energy (fun v => c * x v) = c ^ 2 * G.energy x := by
+  classical
+  unfold energy
+  rw [Finset.mul_sum]
+  apply Finset.sum_congr rfl
+  intro e he
+  induction e using Sym2.ind
+  case h u =>
+    simp
+    ring_nf
+
 noncomputable def deg_norm (G : SimpleGraph α) (x : α → ℝ) : ℝ :=
   ∑ v ∈ V(G), ↑(#δ(G,v)) * x v ^ 2
 
@@ -129,42 +136,70 @@ lemma deg_norm_eq_sum_reg (G : SimpleGraph α) (x : α → ℝ) (d : ℕ)
   intro v hv
   rw [h_reg v hv]
 
+lemma deg_norm_mul (G : SimpleGraph α) (x : α → ℝ) (c : ℝ) :
+    G.deg_norm (fun v => c * x v) = c ^ 2 * G.deg_norm x := by
+  classical
+  unfold deg_norm
+  rw [Finset.mul_sum]
+  apply Finset.sum_congr rfl
+  intro v hv
+  ring
+
 lemma rQ_eq_energy_div_norm (G : SimpleGraph α) (x : α → ℝ) :
     G.rayleighQuotient x = G.energy x / G.deg_norm x := by
   unfold rayleighQuotient
   rfl
 
-/-- Symmetry of the cut: The number of edges crossing from S to its complement
-    is the same as from the complement to S. -/
-lemma cutSize_symm (G : SimpleGraph α) (S : Finset α) :
-    (Cut G S).card = (Cut G (V(G) \ S)).card := by
-  -- Use the library property that Cut G S = Cut G Sᶜ
-  -- rw [Cut_complement]
-  sorry
+lemma rayleighQuotient_mul (G : SimpleGraph α) (x : α → ℝ) {c : ℝ} (hc : c ≠ 0) :
+    G.rayleighQuotient (fun v => c * x v) = G.rayleighQuotient x := by
+  rw [rQ_eq_energy_div_norm, rQ_eq_energy_div_norm]
+  rw [energy_mul, deg_norm_mul]
+  field_simp [pow_ne_zero 2 hc]
 
-/-- In a d-regular graph, if |S| ≤ n/2, the expansion of the complement
-    is at most the expansion of S. -/
-lemma edgeExpansion_complement (G : SimpleGraph α) (d : ℕ) (S : Finset α)
-    (hS : S ⊆ V(G)) (h_size : 2 * S.card ≤ (V(G)).card) (h_d : 0 < d) :
-    edgeExpansion G d (V(G) \ S) ≤ edgeExpansion G d S := by
-  unfold edgeExpansion
-  -- 1. Numerators are equal: |Cut(S)| = |Cut(Sᶜ)|
-  have h_num : (Cut G S).card = (Cut G (V(G) \ S)).card := by
-    -- Edges crossing the boundary are the same for S and its complement
-    -- rw [Cut_complement]
-    sorry
-  rw [h_num]
-  -- 2. Denominators: d * |V \ S| ≥ d * |S|
-  apply div_le_div_of_nonneg_left
-  · exact Nat.cast_nonneg _
-  · apply mul_pos
-    norm_cast
-    -- Since S ⊆ V and 2|S| ≤ |V|, |V \ S| ≥ |S|. If S is non-empty, |V \ S| > 0.
-    sorry
-  · gcongr
-    -- simp only [Nat.cast_le]
-    -- Since 2 * |S| ≤ |V|, |S| ≤ |V| - |S| = |V \ S|
-    -- omega
-    sorry
+
+noncomputable def restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) : α → ℝ :=
+  fun v => if v ∈ V(G) then x v else 0
+
+lemma energy_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
+    G.energy (restrictToVertexSet G x) = G.energy x := by
+  classical
+  unfold energy restrictToVertexSet
+  apply Finset.sum_congr rfl
+  intro e he
+  induction e using Sym2.ind
+  case h =>
+    have huV : x_1 ∈ V(G) := G.incidence s(x_1, y) he x_1 (Sym2.mem_mk_left x_1 y)
+    have hvV : y ∈ V(G) := G.incidence s(x_1, y) he y (Sym2.mem_mk_right x_1 y)
+    simp [huV, hvV]
+
+lemma deg_norm_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
+    G.deg_norm (restrictToVertexSet G x) = G.deg_norm x := by
+  classical
+  unfold deg_norm restrictToVertexSet
+  apply Finset.sum_congr rfl
+  intro v hv
+  simp [hv]
+
+lemma rayleighQuotient_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
+    G.rayleighQuotient (restrictToVertexSet G x) = G.rayleighQuotient x := by
+  rw [rQ_eq_energy_div_norm, rQ_eq_energy_div_norm]
+  rw [energy_restrictToVertexSet, deg_norm_restrictToVertexSet]
+
+lemma orthogonalVectors_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ)
+    (horth : x ∈ orthogonalVectors G) :
+    restrictToVertexSet G x ∈ orthogonalVectors G := by
+  classical
+  rcases horth with ⟨horth, hne⟩
+  constructor
+  · unfold restrictToVertexSet
+    rw [show (∑ v ∈ V(G), ↑(#δ(G,v)) * (if v ∈ V(G) then x v else 0)) =
+        ∑ v ∈ V(G), ↑(#δ(G,v)) * x v by
+      apply Finset.sum_congr rfl
+      intro v hv
+      simp [hv]]
+    exact horth
+  · rcases hne with ⟨v, hv, hxv⟩
+    exact ⟨v, hv, by simpa [restrictToVertexSet, hv] using hxv⟩
+
 
 end SimpleGraph
