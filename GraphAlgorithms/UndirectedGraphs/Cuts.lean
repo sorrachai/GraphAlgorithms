@@ -82,14 +82,14 @@ lemma st_min_cut {G : SimpleGraph α} {U : Finset α} {s t : α} {w : Edge α �
   (h : (st_cuts G s t).Nonempty) :
   is_st_mincut G U s t w ↔ is_st_cut G U s t ∧ weight G U w = st_mincut_value G s t w h := by
   constructor
-  · intro hmin;  simp_all [is_st_mincut]
+  · intro hmin;  simp_all only [is_st_mincut, true_and]
     apply le_antisymm
     · apply le_min'; grind [st_cuts]
     · apply min'_le; grind [st_cuts, is_st_cut]
   · rintro ⟨h1,h2⟩
-    unfold is_st_mincut; simp_all
+    unfold is_st_mincut; simp_all only [true_and]
     rintro W hW; rw[<-h2]
-    unfold st_mincut_value at h2; simp_all; apply min'_le
+    unfold st_mincut_value at h2; simp_all only; apply min'_le
     grind [st_cuts, is_st_cut]
 
 
