@@ -1,25 +1,21 @@
 import Mathlib.Tactic
 import Mathlib.Order.WithBot
 import Mathlib.Data.Sym.Sym2
-import Mathlib.Data.Sym.Sym2.Order
 import Mathlib.Data.Real.Basic
 import Mathlib.Data.Finset.Basic
 
-import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
 import GraphAlgorithms.UndirectedGraphs.Cuts
+import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
+import GraphAlgorithms.UndirectedGraphs.Helper
 
 -- Cuts and contractions (undirected simple)
--- Authors: Yuchen Zhong
--- Vibe coding assist by Gemini
+-- Authors: Yuchen Zhong, Weixuan Yuan
+-- LLM: Gemini, GPT-5.5 on codex
 
 set_option tactic.hygienic false
 
-variable {α : Type*} [DecidableEq α]
-
 open Finset
-open SimpleGraph Cuts
-
-variable {V : Type*} [Fintype V] [DecidableEq V]
+open Cuts
 
 namespace SimpleGraph
 
@@ -108,6 +104,18 @@ lemma energy_nonneg (G : SimpleGraph α) (x : α → ℝ) :
     dsimp
     apply sq_nonneg
 
+lemma energy_mul (G : SimpleGraph α) (x : α → ℝ) (c : ℝ) :
+    G.energy (fun v => c * x v) = c ^ 2 * G.energy x := by
+  classical
+  unfold energy
+  rw [Finset.mul_sum]
+  apply Finset.sum_congr rfl
+  intro e he
+  induction e using Sym2.ind
+  case h u =>
+    simp
+    ring_nf
+
 noncomputable def deg_norm (G : SimpleGraph α) (x : α → ℝ) : ℝ :=
   ∑ v ∈ V(G), ↑(#δ(G,v)) * x v ^ 2
 
@@ -129,42 +137,142 @@ lemma deg_norm_eq_sum_reg (G : SimpleGraph α) (x : α → ℝ) (d : ℕ)
   intro v hv
   rw [h_reg v hv]
 
+lemma deg_norm_mul (G : SimpleGraph α) (x : α → ℝ) (c : ℝ) :
+    G.deg_norm (fun v => c * x v) = c ^ 2 * G.deg_norm x := by
+  classical
+  unfold deg_norm
+  rw [Finset.mul_sum]
+  apply Finset.sum_congr rfl
+  intro v hv
+  ring
+
+lemma deg_norm_shifted_parts_add (G : SimpleGraph α) (z : α → ℝ) :
+    G.deg_norm (fun v => max (z v) 0) +
+      G.deg_norm (fun v => max (-(z v)) 0) =
+        G.deg_norm z := by
+  unfold deg_norm
+  rw [← Finset.sum_add_distrib]
+  apply Finset.sum_congr rfl
+  intro v hv
+  rw [← mul_add, pos_neg_sq_add]
+
+lemma energy_shifted_parts_add_le (G : SimpleGraph α) (z : α → ℝ) :
+    G.energy (fun v => max (z v) 0) +
+      G.energy (fun v => max (-(z v)) 0) ≤
+        G.energy z := by
+  unfold energy
+  rw [← Finset.sum_add_distrib]
+  apply Finset.sum_le_sum
+  intro e he
+  induction e using Sym2.ind
+  case h =>
+    dsimp
+    exact pos_neg_sub_sq_add_le (z x) (z y)
+
 lemma rQ_eq_energy_div_norm (G : SimpleGraph α) (x : α → ℝ) :
     G.rayleighQuotient x = G.energy x / G.deg_norm x := by
   unfold rayleighQuotient
   rfl
 
-/-- Symmetry of the cut: The number of edges crossing from S to its complement
-    is the same as from the complement to S. -/
-lemma cutSize_symm (G : SimpleGraph α) (S : Finset α) :
-    (Cut G S).card = (Cut G (V(G) \ S)).card := by
-  -- Use the library property that Cut G S = Cut G Sᶜ
-  -- rw [Cut_complement]
-  sorry
+lemma rayleighQuotient_mul (G : SimpleGraph α) (x : α → ℝ) {c : ℝ} (hc : c ≠ 0) :
+    G.rayleighQuotient (fun v => c * x v) = G.rayleighQuotient x := by
+  rw [rQ_eq_energy_div_norm, rQ_eq_energy_div_norm]
+  rw [energy_mul, deg_norm_mul]
+  field_simp [pow_ne_zero 2 hc]
 
-/-- In a d-regular graph, if |S| ≤ n/2, the expansion of the complement
-    is at most the expansion of S. -/
-lemma edgeExpansion_complement (G : SimpleGraph α) (d : ℕ) (S : Finset α)
-    (hS : S ⊆ V(G)) (h_size : 2 * S.card ≤ (V(G)).card) (h_d : 0 < d) :
-    edgeExpansion G d (V(G) \ S) ≤ edgeExpansion G d S := by
+
+noncomputable def restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) : α → ℝ :=
+  fun v => if v ∈ V(G) then x v else 0
+
+lemma energy_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
+    G.energy (restrictToVertexSet G x) = G.energy x := by
+  classical
+  unfold energy restrictToVertexSet
+  apply Finset.sum_congr rfl
+  intro e he
+  induction e using Sym2.ind
+  case h =>
+    have huV : x_1 ∈ V(G) := G.incidence s(x_1, y) he x_1 (Sym2.mem_mk_left x_1 y)
+    have hvV : y ∈ V(G) := G.incidence s(x_1, y) he y (Sym2.mem_mk_right x_1 y)
+    simp [huV, hvV]
+
+lemma deg_norm_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
+    G.deg_norm (restrictToVertexSet G x) = G.deg_norm x := by
+  classical
+  unfold deg_norm restrictToVertexSet
+  apply Finset.sum_congr rfl
+  intro v hv
+  simp [hv]
+
+lemma rayleighQuotient_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ) :
+    G.rayleighQuotient (restrictToVertexSet G x) = G.rayleighQuotient x := by
+  rw [rQ_eq_energy_div_norm, rQ_eq_energy_div_norm]
+  rw [energy_restrictToVertexSet, deg_norm_restrictToVertexSet]
+
+lemma orthogonalVectors_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ)
+    (horth : x ∈ orthogonalVectors G) :
+    restrictToVertexSet G x ∈ orthogonalVectors G := by
+  classical
+  rcases horth with ⟨horth, hne⟩
+  constructor
+  · unfold restrictToVertexSet
+    rw [show (∑ v ∈ V(G), ↑(#δ(G,v)) * (if v ∈ V(G) then x v else 0)) =
+        ∑ v ∈ V(G), ↑(#δ(G,v)) * x v by
+      apply Finset.sum_congr rfl
+      intro v hv
+      simp [hv]]
+    exact horth
+  · rcases hne with ⟨v, hv, hxv⟩
+    exact ⟨v, hv, by simpa [restrictToVertexSet, hv] using hxv⟩
+
+-- Only consider |S| <= |V|/2 in graph expansion
+-- Could be merged with above definition
+noncomputable def graphExpansionValidSubsets (G : SimpleGraph α) : Finset (Finset α) :=
+  (V(G).powerset).filter (fun S => S.Nonempty ∧ 2 * S.card ≤ (V(G)).card)
+
+lemma mem_graphExpansionValidSubsets_of_valid (G : SimpleGraph α) (S : Finset α)
+    (hS_ne : S.Nonempty) (hS_sub : S ⊆ V(G))
+    (hS_size : 2 * S.card ≤ (V(G)).card) :
+    S ∈ graphExpansionValidSubsets G := by
+  classical
+  simp [graphExpansionValidSubsets, hS_sub, hS_ne, hS_size]
+
+lemma graphExpansionValidSubsets_nonempty_of_valid (G : SimpleGraph α) (S : Finset α)
+    (hS_ne : S.Nonempty) (hS_sub : S ⊆ V(G))
+    (hS_size : 2 * S.card ≤ (V(G)).card) :
+    (graphExpansionValidSubsets G).Nonempty := by
+  exact ⟨S, mem_graphExpansionValidSubsets_of_valid G S hS_ne hS_sub hS_size⟩
+
+lemma edgeExpansion_mem_graphExpansion_image_of_valid (G : SimpleGraph α) (d : ℕ)
+    (S : Finset α) (hS_ne : S.Nonempty) (hS_sub : S ⊆ V(G))
+    (hS_size : 2 * S.card ≤ (V(G)).card) :
+    edgeExpansion G d S ∈ (graphExpansionValidSubsets G).image (fun T => edgeExpansion G d T) := by
+  exact Finset.mem_image.mpr
+    ⟨S, mem_graphExpansionValidSubsets_of_valid G S hS_ne hS_sub hS_size, rfl⟩
+
+lemma edgeExpansion_zero_degree (G : SimpleGraph α) (S : Finset α) :
+    edgeExpansion G 0 S = 0 := by
   unfold edgeExpansion
-  -- 1. Numerators are equal: |Cut(S)| = |Cut(Sᶜ)|
-  have h_num : (Cut G S).card = (Cut G (V(G) \ S)).card := by
-    -- Edges crossing the boundary are the same for S and its complement
-    -- rw [Cut_complement]
-    sorry
-  rw [h_num]
-  -- 2. Denominators: d * |V \ S| ≥ d * |S|
-  apply div_le_div_of_nonneg_left
-  · exact Nat.cast_nonneg _
-  · apply mul_pos
-    norm_cast
-    -- Since S ⊆ V and 2|S| ≤ |V|, |V \ S| ≥ |S|. If S is non-empty, |V \ S| > 0.
-    sorry
-  · gcongr
-    -- simp only [Nat.cast_le]
-    -- Since 2 * |S| ≤ |V|, |S| ≤ |V| - |S| = |V \ S|
-    -- omega
-    sorry
+  simp
+
+lemma graphExpansion_zero_degree (G : SimpleGraph α) :
+    graphExpansion G 0 = 0 := by
+  classical
+  unfold graphExpansion
+  dsimp only
+  split_ifs with h
+  · apply le_antisymm
+    · obtain ⟨S, hS⟩ := h
+      have hm : edgeExpansion G 0 S ∈ (Finset.image (fun S => edgeExpansion G 0 S)
+          {S ∈ V(G).powerset | S.Nonempty ∧ 2 * #S ≤ #V(G)}) := by
+        exact Finset.mem_image.mpr ⟨S, hS, rfl⟩
+      have hz : edgeExpansion G 0 S = 0 := edgeExpansion_zero_degree G S
+      simpa [hz] using Finset.min'_le _ _ hm
+    · apply Finset.le_min'
+      intro x hx
+      rcases Finset.mem_image.mp hx with ⟨S, hS, rfl⟩
+      rw [edgeExpansion_zero_degree]
+  · rfl
+
 
 end SimpleGraph
