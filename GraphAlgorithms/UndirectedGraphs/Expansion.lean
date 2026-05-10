@@ -6,6 +6,7 @@ import Mathlib.Data.Finset.Basic
 
 import GraphAlgorithms.UndirectedGraphs.Cuts
 import GraphAlgorithms.UndirectedGraphs.SimpleGraphs
+import GraphAlgorithms.UndirectedGraphs.Helper
 
 -- Cuts and contractions (undirected simple)
 -- Authors: Yuchen Zhong, Weixuan Yuan
@@ -145,6 +146,29 @@ lemma deg_norm_mul (G : SimpleGraph α) (x : α → ℝ) (c : ℝ) :
   intro v hv
   ring
 
+lemma deg_norm_shifted_parts_add (G : SimpleGraph α) (z : α → ℝ) :
+    G.deg_norm (fun v => max (z v) 0) +
+      G.deg_norm (fun v => max (-(z v)) 0) =
+        G.deg_norm z := by
+  unfold deg_norm
+  rw [← Finset.sum_add_distrib]
+  apply Finset.sum_congr rfl
+  intro v hv
+  rw [← mul_add, pos_neg_sq_add]
+
+lemma energy_shifted_parts_add_le (G : SimpleGraph α) (z : α → ℝ) :
+    G.energy (fun v => max (z v) 0) +
+      G.energy (fun v => max (-(z v)) 0) ≤
+        G.energy z := by
+  unfold energy
+  rw [← Finset.sum_add_distrib]
+  apply Finset.sum_le_sum
+  intro e he
+  induction e using Sym2.ind
+  case h =>
+    dsimp
+    exact pos_neg_sub_sq_add_le (z x) (z y)
+
 lemma rQ_eq_energy_div_norm (G : SimpleGraph α) (x : α → ℝ) :
     G.rayleighQuotient x = G.energy x / G.deg_norm x := by
   unfold rayleighQuotient
@@ -200,6 +224,55 @@ lemma orthogonalVectors_restrictToVertexSet (G : SimpleGraph α) (x : α → ℝ
     exact horth
   · rcases hne with ⟨v, hv, hxv⟩
     exact ⟨v, hv, by simpa [restrictToVertexSet, hv] using hxv⟩
+
+-- Only consider |S| <= |V|/2 in graph expansion
+-- Could be merged with above definition
+noncomputable def graphExpansionValidSubsets (G : SimpleGraph α) : Finset (Finset α) :=
+  (V(G).powerset).filter (fun S => S.Nonempty ∧ 2 * S.card ≤ (V(G)).card)
+
+lemma mem_graphExpansionValidSubsets_of_valid (G : SimpleGraph α) (S : Finset α)
+    (hS_ne : S.Nonempty) (hS_sub : S ⊆ V(G))
+    (hS_size : 2 * S.card ≤ (V(G)).card) :
+    S ∈ graphExpansionValidSubsets G := by
+  classical
+  simp [graphExpansionValidSubsets, hS_sub, hS_ne, hS_size]
+
+lemma graphExpansionValidSubsets_nonempty_of_valid (G : SimpleGraph α) (S : Finset α)
+    (hS_ne : S.Nonempty) (hS_sub : S ⊆ V(G))
+    (hS_size : 2 * S.card ≤ (V(G)).card) :
+    (graphExpansionValidSubsets G).Nonempty := by
+  exact ⟨S, mem_graphExpansionValidSubsets_of_valid G S hS_ne hS_sub hS_size⟩
+
+lemma edgeExpansion_mem_graphExpansion_image_of_valid (G : SimpleGraph α) (d : ℕ)
+    (S : Finset α) (hS_ne : S.Nonempty) (hS_sub : S ⊆ V(G))
+    (hS_size : 2 * S.card ≤ (V(G)).card) :
+    edgeExpansion G d S ∈ (graphExpansionValidSubsets G).image (fun T => edgeExpansion G d T) := by
+  exact Finset.mem_image.mpr
+    ⟨S, mem_graphExpansionValidSubsets_of_valid G S hS_ne hS_sub hS_size, rfl⟩
+
+lemma edgeExpansion_zero_degree (G : SimpleGraph α) (S : Finset α) :
+    edgeExpansion G 0 S = 0 := by
+  unfold edgeExpansion
+  simp
+
+lemma graphExpansion_zero_degree (G : SimpleGraph α) :
+    graphExpansion G 0 = 0 := by
+  classical
+  unfold graphExpansion
+  dsimp only
+  split_ifs with h
+  · apply le_antisymm
+    · obtain ⟨S, hS⟩ := h
+      have hm : edgeExpansion G 0 S ∈ (Finset.image (fun S => edgeExpansion G 0 S)
+          {S ∈ V(G).powerset | S.Nonempty ∧ 2 * #S ≤ #V(G)}) := by
+        exact Finset.mem_image.mpr ⟨S, hS, rfl⟩
+      have hz : edgeExpansion G 0 S = 0 := edgeExpansion_zero_degree G S
+      simpa [hz] using Finset.min'_le _ _ hm
+    · apply Finset.le_min'
+      intro x hx
+      rcases Finset.mem_image.mp hx with ⟨S, hS, rfl⟩
+      rw [edgeExpansion_zero_degree]
+  · rfl
 
 
 end SimpleGraph
