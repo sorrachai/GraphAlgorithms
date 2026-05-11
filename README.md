@@ -13,7 +13,6 @@ Among others:
 - **Walks & connectivity.** Walks, paths, cycles, Eulerian walks, components.
 - **Trees.** Trees and forests, Cayley's theorem on the number of labeled trees.
 - **Spectral graph theory.** Laplacian, Cheeger's inequality (upper and lower bounds), expansion / expander graphs.
-- **Tutte's theorem.** Existence of perfect matchings via the Tutte–Berge formula.
 - **Matchings.** Matchings, augmenting paths, Hall's theorem, König's theorem.
 - **Colorings.** Proper vertex and edge colorings, chromatic number, basic bounds.
 - **Contractions, minors, topological minors.** Edge/vertex contractions and the minor and topological-minor relations.
@@ -21,7 +20,7 @@ Among others:
 
 ### Algorithms
 
-- **Flows.** Ford–Fulkerson, Edmonds–Karp, Push–Relabel, and **Kyng's near-linear-time max-flow algorithm** (the central algorithmic target).
+- **Flows.** Ford–Fulkerson, Edmonds–Karp, Push–Relabel.
 - **Graph traversal.** BFS, DFS.
 - **Shortest paths.** Dijkstra, Bellman–Ford, Floyd–Warshall.
 - **Minimum spanning trees.** Kruskal, Prim, Borůvka.
