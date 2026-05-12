@@ -1,0 +1,37 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Lean build (compilation + mathlib-style linters)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build GraphLib
+        # `weak.linter.mathlibStandardSet = true` is set in lakefile.toml, so
+        # mathlib-style linter warnings surface in the build log during this step.
+        uses: leanprover/lean-action@v1
+
+  no-sorries:
+    name: No sorry / admit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for sorry and admit
+        run: |
+          set -e
+          # Match `sorry` or `admit` as whole tokens in Lean source under GraphLib/.
+          # Excludes comments via a simple heuristic: lines starting with `--` or inside `/- ... -/`
+          # are not stripped, but the grep below catches the common case where these tokens
+          # appear in code. Reviewers can still inspect any flagged lines.
+          if grep -rnE '(^|[^a-zA-Z_])(sorry|admit)([^a-zA-Z_]|$)' GraphLib/ GraphLib.lean; then
+            echo "::error::Found sorry/admit in source. Please remove before merging."
+            exit 1
+          fi
+          echo "No sorry/admit found."
