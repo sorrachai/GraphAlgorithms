@@ -35,8 +35,7 @@ Every algorithm comes with a proof of correctness and a proof of runtime.
 GraphLib/
 ├── Basic/          -- core graph structures (Graph, SimpleGraph, DiGraph, SimpleDiGraph)
 ├── Theory/         -- mathematical results (walks, trees, spectral, matching, …)
-├── Algorithms/     -- algorithm implementations and correctness proofs
-└── Data/           -- supporting data structures (e.g. splay trees)
+└── Algorithms/     -- algorithm implementations and correctness proofs
 ```
 
 ## Building
