@@ -1,4 +1,4 @@
-import GraphLib.Graphs.Basic
+import GraphLib.Graph.Basic
 
 import GraphLib.Theory.Basic
 import GraphLib.Theory.Walks.Basic
@@ -16,4 +16,5 @@ import GraphLib.Algorithms.ShortestPath.Basic
 import GraphLib.Algorithms.MST.Basic
 import GraphLib.Algorithms.Flow.Basic
 import GraphLib.Algorithms.SCC.Basic
-import GraphLib.Algorithms.UnionFind.Basic
+
+import GraphLib.DataStructures.UnionFind.Basic
