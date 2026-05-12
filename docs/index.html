@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GraphLib · formal graph theory in Lean 4</title>
+  <meta name="description" content="A Lean 4 library for formal graph theory and graph algorithms." />
+  <style>
+    :root {
+      --bg: #fafaf7;
+      --fg: #1a1a1a;
+      --muted: #5c5c5c;
+      --rule: #e6e3da;
+      --accent: #2b5d34;
+      --card: #ffffff;
+      --code-bg: #f1ede3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14171a;
+        --fg: #ecebe6;
+        --muted: #9aa0a6;
+        --rule: #2b2f33;
+        --accent: #8bc796;
+        --card: #1b1f23;
+        --code-bg: #1f2429;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Hero — full viewport, centered */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+    .hero-inner {
+      max-width: 640px;
+      width: 100%;
+      text-align: center;
+    }
+    .logo {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin: 0 0 3rem;
+    }
+    h1 {
+      font-size: 2.4rem;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin: 0 0 2.5rem;
+      font-weight: 600;
+    }
+    .lede {
+      font-size: 1.1rem;
+      color: var(--muted);
+      margin: 0 auto 4.75rem;
+      max-width: 56ch;
+    }
+    .actions {
+      display: flex;
+      gap: 1.1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      display: inline-block;
+      padding: 0.6rem 1.15rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      text-decoration: none;
+      border: 1px solid var(--rule);
+      color: var(--fg);
+      background: var(--card);
+      transition: border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+    .btn.primary:hover { opacity: 0.9; color: var(--bg); }
+    .btn.disabled {
+      color: var(--muted);
+      cursor: not-allowed;
+      pointer-events: none;
+      opacity: 0.55;
+    }
+
+    /* Roadmap overlay — hidden until :target */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    .overlay:target {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .overlay-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 6rem 1.5rem 6rem;
+    }
+    .overlay-close {
+      position: fixed;
+      top: 1rem;
+      right: 1.25rem;
+      font-size: 1.5rem;
+      line-height: 1;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 0.4rem 0.6rem;
+      border-radius: 4px;
+    }
+    .overlay-close:hover { color: var(--accent); }
+    .overlay h2 {
+      font-size: 2.1rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+      margin: 5rem 0 1.5rem;
+      padding-top: 4rem;
+      border-top: 1px solid var(--rule);
+    }
+    .overlay h2:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    .overlay .prose {
+      font-size: 1.02rem;
+      line-height: 1.7;
+      color: var(--fg);
+      margin: 0 0 1.4rem;
+    }
+    .overlay .prose:last-of-type {
+      margin-bottom: 0;
+    }
+    .overlay .prose .kw {
+      color: var(--fg);
+      text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, var(--accent) 75%, transparent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
+    .overlay h4 {
+      font-size: 0.76rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin: 2.75rem 0 1.1rem;
+    }
+    ul.plain {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    ul.plain li {
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: 12rem 1fr;
+      gap: 1.5rem;
+      align-items: baseline;
+    }
+    ul.plain li:first-child { border-top: 1px solid var(--rule); }
+    ul.plain .topic {
+      font-weight: 500;
+      color: var(--fg);
+    }
+    ul.plain .desc { color: var(--muted); font-size: 0.96rem; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9rem;
+    }
+    a { color: var(--accent); }
+
+    /* Background graph */
+    .bg-graph {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .bg-graph .edges line {
+      stroke: var(--accent);
+      stroke-width: 0.9;
+      fill: none;
+      opacity: 0.08;
+      vector-effect: non-scaling-stroke;
+    }
+    .bg-graph .nodes circle {
+      fill: var(--accent);
+      opacity: 0.28;
+    }
+    .hero { position: relative; z-index: 1; }
+
+    @media (max-width: 520px) {
+      h1 { font-size: 1.95rem; }
+      .lede { font-size: 1rem; }
+      .overlay-inner { padding: 4rem 1.25rem; }
+      .overlay h2 { font-size: 1.75rem; padding-top: 2.5rem; margin: 3rem 0 1.25rem; }
+      ul.plain li { grid-template-columns: 1fr; gap: 0.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <svg class="bg-graph" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g class="edges">
+      <!-- top band -->
+      <line x1="40"   y1="70"  x2="220"  y2="40"/>
+      <line x1="220"  y1="40"  x2="420"  y2="120"/>
+      <line x1="420"  y1="120" x2="620"  y2="60"/>
+      <line x1="620"  y1="60"  x2="820"  y2="130"/>
+      <line x1="820"  y1="130" x2="1020" y2="50"/>
+      <line x1="1020" y1="50"  x2="1220" y2="140"/>
+      <line x1="1220" y1="140" x2="1420" y2="60"/>
+      <line x1="1420" y1="60"  x2="1570" y2="200"/>
+      <!-- top → upper mid -->
+      <line x1="40"   y1="70"  x2="110"  y2="250"/>
+      <line x1="220"  y1="40"  x2="320"  y2="310"/>
+      <line x1="420"  y1="120" x2="320"  y2="310"/>
+      <line x1="420"  y1="120" x2="530"  y2="240"/>
+      <line x1="620"  y1="60"  x2="530"  y2="240"/>
+      <line x1="620"  y1="60"  x2="730"  y2="350"/>
+      <line x1="820"  y1="130" x2="730"  y2="350"/>
+      <line x1="820"  y1="130" x2="930"  y2="270"/>
+      <line x1="1020" y1="50"  x2="930"  y2="270"/>
+      <line x1="1020" y1="50"  x2="1130" y2="360"/>
+      <line x1="1220" y1="140" x2="1130" y2="360"/>
+      <line x1="1220" y1="140" x2="1330" y2="290"/>
+      <line x1="1420" y1="60"  x2="1330" y2="290"/>
+      <line x1="1570" y1="200" x2="1530" y2="380"/>
+      <!-- upper mid chain -->
+      <line x1="110"  y1="250" x2="320"  y2="310"/>
+      <line x1="320"  y1="310" x2="530"  y2="240"/>
+      <line x1="530"  y1="240" x2="730"  y2="350"/>
+      <line x1="730"  y1="350" x2="930"  y2="270"/>
+      <line x1="930"  y1="270" x2="1130" y2="360"/>
+      <line x1="1130" y1="360" x2="1330" y2="290"/>
+      <line x1="1330" y1="290" x2="1530" y2="380"/>
+      <!-- upper mid → mid -->
+      <line x1="110"  y1="250" x2="70"   y2="480"/>
+      <line x1="320"  y1="310" x2="270"  y2="550"/>
+      <line x1="320"  y1="310" x2="480"  y2="470"/>
+      <line x1="530"  y1="240" x2="480"  y2="470"/>
+      <line x1="730"  y1="350" x2="680"  y2="580"/>
+      <line x1="730"  y1="350" x2="880"  y2="490"/>
+      <line x1="930"  y1="270" x2="880"  y2="490"/>
+      <line x1="1130" y1="360" x2="1080" y2="600"/>
+      <line x1="1330" y1="290" x2="1280" y2="510"/>
+      <line x1="1530" y1="380" x2="1480" y2="600"/>
+      <!-- mid chain -->
+      <line x1="70"   y1="480" x2="270"  y2="550"/>
+      <line x1="270"  y1="550" x2="480"  y2="470"/>
+      <line x1="480"  y1="470" x2="680"  y2="580"/>
+      <line x1="680"  y1="580" x2="880"  y2="490"/>
+      <line x1="880"  y1="490" x2="1080" y2="600"/>
+      <line x1="1080" y1="600" x2="1280" y2="510"/>
+      <line x1="1280" y1="510" x2="1480" y2="600"/>
+      <!-- mid → lower mid -->
+      <line x1="70"   y1="480" x2="130"  y2="750"/>
+      <line x1="270"  y1="550" x2="340"  y2="810"/>
+      <line x1="480"  y1="470" x2="560"  y2="720"/>
+      <line x1="680"  y1="580" x2="560"  y2="720"/>
+      <line x1="680"  y1="580" x2="760"  y2="830"/>
+      <line x1="880"  y1="490" x2="970"  y2="750"/>
+      <line x1="1080" y1="600" x2="970"  y2="750"/>
+      <line x1="1080" y1="600" x2="1180" y2="850"/>
+      <line x1="1280" y1="510" x2="1390" y2="780"/>
+      <line x1="1480" y1="600" x2="1560" y2="870"/>
+      <!-- lower mid chain -->
+      <line x1="130"  y1="750" x2="340"  y2="810"/>
+      <line x1="340"  y1="810" x2="560"  y2="720"/>
+      <line x1="560"  y1="720" x2="760"  y2="830"/>
+      <line x1="760"  y1="830" x2="970"  y2="750"/>
+      <line x1="970"  y1="750" x2="1180" y2="850"/>
+      <line x1="1180" y1="850" x2="1390" y2="780"/>
+      <line x1="1390" y1="780" x2="1560" y2="870"/>
+      <!-- bottom band -->
+      <line x1="130"  y1="750" x2="60"   y2="960"/>
+      <line x1="340"  y1="810" x2="250"  y2="970"/>
+      <line x1="340"  y1="810" x2="480"  y2="940"/>
+      <line x1="560"  y1="720" x2="480"  y2="940"/>
+      <line x1="560"  y1="720" x2="700"  y2="970"/>
+      <line x1="760"  y1="830" x2="700"  y2="970"/>
+      <line x1="760"  y1="830" x2="920"  y2="940"/>
+      <line x1="970"  y1="750" x2="920"  y2="940"/>
+      <line x1="970"  y1="750" x2="1130" y2="970"/>
+      <line x1="1180" y1="850" x2="1130" y2="970"/>
+      <line x1="1180" y1="850" x2="1340" y2="940"/>
+      <line x1="1390" y1="780" x2="1340" y2="940"/>
+      <line x1="60"   y1="960" x2="250"  y2="970"/>
+      <line x1="250"  y1="970" x2="480"  y2="940"/>
+      <line x1="480"  y1="940" x2="700"  y2="970"/>
+      <line x1="700"  y1="970" x2="920"  y2="940"/>
+      <line x1="920"  y1="940" x2="1130" y2="970"/>
+      <line x1="1130" y1="970" x2="1340" y2="940"/>
+    </g>
+    <g class="nodes">
+      <circle cx="40"   cy="70"  r="2"/>
+      <circle cx="220"  cy="40"  r="3"/>
+      <circle cx="420"  cy="120" r="2.5"/>
+      <circle cx="620"  cy="60"  r="2.5"/>
+      <circle cx="820"  cy="130" r="3"/>
+      <circle cx="1020" cy="50"  r="2.5"/>
+      <circle cx="1220" cy="140" r="2.5"/>
+      <circle cx="1420" cy="60"  r="3"/>
+      <circle cx="1570" cy="200" r="2"/>
+      <circle cx="110"  cy="250" r="2.5"/>
+      <circle cx="320"  cy="310" r="3.5"/>
+      <circle cx="530"  cy="240" r="2.5"/>
+      <circle cx="730"  cy="350" r="3"/>
+      <circle cx="930"  cy="270" r="3"/>
+      <circle cx="1130" cy="360" r="3.5"/>
+      <circle cx="1330" cy="290" r="3"/>
+      <circle cx="1530" cy="380" r="2.5"/>
+      <circle cx="70"   cy="480" r="2"/>
+      <circle cx="270"  cy="550" r="3"/>
+      <circle cx="480"  cy="470" r="3.5"/>
+      <circle cx="680"  cy="580" r="4"/>
+      <circle cx="880"  cy="490" r="2.5"/>
+      <circle cx="1080" cy="600" r="3.5"/>
+      <circle cx="1280" cy="510" r="3"/>
+      <circle cx="1480" cy="600" r="2.5"/>
+      <circle cx="130"  cy="750" r="2.5"/>
+      <circle cx="340"  cy="810" r="3"/>
+      <circle cx="560"  cy="720" r="3"/>
+      <circle cx="760"  cy="830" r="3.5"/>
+      <circle cx="970"  cy="750" r="3.5"/>
+      <circle cx="1180" cy="850" r="3.5"/>
+      <circle cx="1390" cy="780" r="3"/>
+      <circle cx="1560" cy="870" r="2.5"/>
+      <circle cx="60"   cy="960" r="2"/>
+      <circle cx="250"  cy="970" r="2.5"/>
+      <circle cx="480"  cy="940" r="2.5"/>
+      <circle cx="700"  cy="970" r="3"/>
+      <circle cx="920"  cy="940" r="2.5"/>
+      <circle cx="1130" cy="970" r="2.5"/>
+      <circle cx="1340" cy="940" r="3"/>
+    </g>
+  </svg>
+
+  <main class="hero">
+    <div class="hero-inner">
+      <p class="logo">GraphLib</p>
+      <h1>Formal graph theory in Lean&nbsp;4.</h1>
+      <p class="lede">
+        A library of machine-checked definitions, theorems, and algorithms for graphs,
+        covering the standard undergraduate-through-graduate curriculum.
+        It spans walks, trees, and colorings through spectral methods, matchings, and planarity,
+        alongside classical algorithms shipped with proofs of correctness and runtime.
+      </p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/sorrachai/GraphLib" rel="noopener">View on GitHub</a>
+        <a class="btn disabled" href="#" aria-disabled="true">Documentation</a>
+        <a class="btn" href="#vision">Vision</a>
+      </div>
+    </div>
+  </main>
+
+  <section id="vision" class="overlay" aria-labelledby="vision-title">
+    <a class="overlay-close" href="#" aria-label="Close vision">&times;</a>
+    <div class="overlay-inner">
+      <h2 id="vision-title">Vision</h2>
+
+      <p class="prose">
+        GraphLib aims to <span class="kw">formalize graph theory and its algorithms</span>,
+        with proofs of both <span class="kw">correctness and runtime</span>, in a way
+        that stays close to the <span class="kw">informal definitions</span> used across
+        the standard graph theory literature. The intent is to
+        <span class="kw">minimize the overhead</span> for practitioners coming from
+        textbook mathematics, so that statements, objects, and arguments in Lean read
+        as directly as possible like their <span class="kw">pen-and-paper counterparts</span>.
+      </p>
+
+      <p class="prose">
+        Where definitions and results prove generally useful, the long-term goal is to
+        <span class="kw">upstream contributions</span> back to
+        <a href="https://github.com/leanprover-community/mathlib4">Mathlib</a> and
+        <a href="https://github.com/leanprover/cslib">cslib</a>, so that the
+        broader Lean ecosystem benefits.
+      </p>
+
+      <h2>Roadmap</h2>
+      <p class="prose">
+        For <span class="kw">v1</span>, we aim to formalize the following fundamental
+        concepts in graph theory before moving on to more advanced definitions.
+      </p>
+
+      <h4>Theory</h4>
+      <ul class="plain">
+        <li><span class="topic">Walks &amp; connectivity</span><span class="desc">walks, paths, cycles, Eulerian walks, components</span></li>
+        <li><span class="topic">Trees</span><span class="desc">trees and forests, Cayley's theorem</span></li>
+        <li><span class="topic">Spectral</span><span class="desc">Laplacian, Cheeger's inequality, expanders</span></li>
+        <li><span class="topic">Matchings</span><span class="desc">augmenting paths, Hall's theorem, K&ouml;nig's theorem</span></li>
+        <li><span class="topic">Colorings</span><span class="desc">proper vertex and edge colorings, chromatic bounds</span></li>
+        <li><span class="topic">Minors</span><span class="desc">contractions, minors, topological minors</span></li>
+        <li><span class="topic">Planarity</span><span class="desc">Euler's formula, Kuratowski, toroidal graphs</span></li>
+      </ul>
+
+      <h4>Algorithms</h4>
+      <ul class="plain">
+        <li><span class="topic">Flows</span><span class="desc">Ford&ndash;Fulkerson, Edmonds&ndash;Karp, Push&ndash;Relabel</span></li>
+        <li><span class="topic">Traversal</span><span class="desc">BFS, DFS</span></li>
+        <li><span class="topic">Shortest paths</span><span class="desc">Dijkstra, Bellman&ndash;Ford, Floyd&ndash;Warshall</span></li>
+        <li><span class="topic">Spanning trees</span><span class="desc">Kruskal, Prim, Bor&#367;vka</span></li>
+        <li><span class="topic">SCC</span><span class="desc">Tarjan, Kosaraju</span></li>
+        <li><span class="topic">Union&ndash;Find</span><span class="desc">union-by-rank with path compression</span></li>
+      </ul>
+    </div>
+  </section>
+</body>
+</html>
