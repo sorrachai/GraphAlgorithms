@@ -10,9 +10,6 @@ relaxedAutoImplicit = false
 weak.linter.mathlibStandardSet = true
 maxSynthPendingDepth = 3
 
-[[require]]
-name = "mathlib"
-scope = "leanprover-community"
 
 [[require]]
 name = "cslib"
@@ -22,6 +19,10 @@ scope = "leanprover"
 name = "checkdecls"
 scope = "PatrickMassot"
 rev = "master"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
 
 [[lean_lib]]
 name = "GraphLib"
