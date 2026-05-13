@@ -1,7 +1,7 @@
-name = "GraphAlgorithms"
+name = "GraphLib"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["GraphAlgorithms"]
+defaultTargets = ["GraphLib"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
@@ -18,5 +18,10 @@ scope = "leanprover-community"
 name = "cslib"
 scope = "leanprover"
 
+[[require]]
+name = "checkdecls"
+scope = "PatrickMassot"
+rev = "master"
+
 [[lean_lib]]
-name = "GraphAlgorithms"
+name = "GraphLib"
