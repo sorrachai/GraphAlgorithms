@@ -243,9 +243,8 @@ end BinaryTree
 /-! ### BST Structure -/
 section BSTStructure
 
-structure BST (n : ℕ) (α : Type) [LinearOrder α] where
+structure BST (α : Type) [LinearOrder α] where
   tree : BinaryTree α
   hBST : BinaryTree.IsBST tree
-  h_size : tree.num_nodes = n
 
 end BSTStructure
