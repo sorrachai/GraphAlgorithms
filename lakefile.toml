@@ -18,5 +18,10 @@ scope = "leanprover-community"
 name = "cslib"
 scope = "leanprover"
 
+[[require]]
+name = "checkdecls"
+scope = "PatrickMassot"
+rev = "master"
+
 [[lean_lib]]
 name = "GraphLib"
