@@ -41,18 +41,18 @@ jobs:
         uses: leanprover/lean-action@f807b338d95de7813c5c50d018f1c23c9b93b4ec # v1.2.0
 
       - name: Copy README.md to website/index.md
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         run: cp README.md website/index.md
 
       - name: File dependencies
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         run: |
           sudo apt-get update
           sudo apt install graphviz -y
           ~/.elan/bin/lake exe graph website/file_deps.pdf
 
       - name: Build project documentation
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         id: build-docgen
         uses: leanprover-community/docgen-action@main
         with:
