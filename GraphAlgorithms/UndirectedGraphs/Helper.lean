@@ -35,11 +35,7 @@ lemma sum_sq_pos (G : SimpleGraph α) (x : α → ℝ)
   grind
 
 lemma pos_neg_sq_add (a : ℝ) :
-    max a 0 ^ 2 + max (-a) 0 ^ 2 = a ^ 2 := by
-  by_cases ha : 0 ≤ a
-  · simp [max_eq_left ha, max_eq_right (neg_nonpos.mpr ha)]
-  · have ha' : a < 0 := lt_of_not_ge ha
-    simp [max_eq_right ha'.le, max_eq_left (neg_nonneg.mpr ha'.le)]
+    max a 0 ^ 2 + max (-a) 0 ^ 2 = a ^ 2 := by grind
 
 lemma pos_neg_sub_sq_add_le (a b : ℝ) :
     (max a 0 - max b 0) ^ 2 + (max (-a) 0 - max (-b) 0) ^ 2 ≤
