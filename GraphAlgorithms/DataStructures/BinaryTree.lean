@@ -247,4 +247,12 @@ structure BST (α : Type) [LinearOrder α] where
   tree : BinaryTree α
   hBST : BinaryTree.IsBST tree
 
+namespace BST
+
+/-- Checks if the BST contains a given key by delegating to the underlying tree. -/
+def contains [LinearOrder α] (t : BST α) (q : α) : Prop :=
+  t.tree.contains q
+
+end BST
+
 end BSTStructure

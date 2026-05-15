@@ -36,7 +36,7 @@ def splay (t : BST α) (q : α) : BST α :=
 /-! ### Correctness -/
 
 /-- If the underlying BST contains a key, splaying brings it to the root. -/
-theorem splay_root_of_contains (t : BST α) (q : α) (hc : t.tree.contains q) :
+theorem splay_root_of_contains (t : BST α) (q : α) (hc : t.contains q) :
     ∃ l r, (splay t q).tree = .node l q r :=
   SplayTree.splay_root_of_contains t.tree q hc
 
