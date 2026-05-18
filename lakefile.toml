@@ -20,12 +20,12 @@ name = "checkdecls"
 scope = "PatrickMassot"
 rev = "master"
 
-<<<<<<< HEAD
-=======
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
 
->>>>>>> origin/main
 [[lean_lib]]
 name = "GraphLib"
+
+[[lean_lib]]
+name = "GraphAlgorithms"

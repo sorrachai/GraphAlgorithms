@@ -3,8 +3,8 @@ import Mathlib.Order.WithBot
 import Mathlib.Data.Sym.Sym2
 import Mathlib.Data.Finset.Basic
 
-import GraphAlgorithms.DirectedGraphs.SimpleDiGraphs
-import GraphAlgorithms.DirectedGraphs.Walk  -- already incl. GraphAlgorithms.Core.Walk
+import GraphAlgorithms.SimpleGraphs.DirectedGraphs.SimpleDiGraphs
+import GraphAlgorithms.SimpleGraphs.DirectedGraphs.Walk  -- already incl. GraphLib.GraphAlgorithms.Core.Walk
 
 -- Breadth-first Search
 -- Author: Huang, JiangYi (nnhjy <43530784+nnhjy@users.noreply.github.com>);
